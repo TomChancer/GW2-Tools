@@ -233,12 +233,12 @@ function renderCraftResults(results, total) {
   }
 
   if (full.length) {
-    html += `<div class="section-label">✓ Fully craftable from storage</div><div class="recipe-list">`;
+    html += `<div class="section-label">✓ Ready to craft — you have everything</div><div class="recipe-list">`;
     full.forEach(r => html += renderCraftCard(r));
     html += `</div>`;
   }
   if (partial.length) {
-    html += `<div class="section-label" style="margin-top:12px;">🛒 Requires buying ingredients</div><div class="recipe-list">`;
+    html += `<div class="section-label" style="margin-top:12px;">🛒 Need to buy some ingredients first</div><div class="recipe-list">`;
     partial.forEach(r => html += renderCraftCard(r));
     html += `</div>`;
   }
@@ -335,30 +335,45 @@ function renderCraftCard(r) {
     ? `<span class="tag liq-tag liq-${liqTier}" data-liq="${r.recipeId}" title="${liqTitle}">${liqLabels[liqTier]}</span>`
     : '';
 
+  // Total ingredient value at market buy prices — pairs with profitVsRaw so the maths add up
+  const ingredientValue = r.sellInstantAfterFees - r.profitVsRaw;
+
+  // Craft cost sub-note: what the user actually needs to do
+  const craftNote = r.isFullyCraftable
+    ? `<div class="col-sub" style="color:var(--green)">from storage</div>`
+    : r.matCostToBuy > 0
+      ? `<div class="col-sub" style="color:var(--blue)">need to buy ${r.fmt.matCostToBuy}</div>`
+      : '';
+
+  // Listing price hint — only show if listing would get >10% more than instant
+  const listingHint = r.sellListAfterFees > r.sellInstantAfterFees * 1.10
+    ? `<div class="col-sub">or list: ${r.fmt.sellListAfterFees}</div>`
+    : '';
+
   const ingRows = r.allIngredients.map(ing => {
     let sc, st;
-    if (ing.unavailable)                        { sc='missing'; st='N/A'; }
-    else if (ing.buyCount>0 && ing.fromStorage>0){ sc='buy'; st=`Have ${ing.fromStorage}, buy ${ing.buyCount}`; }
-    else if (ing.buyCount>0)                    { sc='buy'; st=`Buy ${ing.buyCount}`; }
-    else                                         { sc='have'; st=`Have ${ing.have}`; }
+    if (ing.unavailable)                         { sc='missing'; st='N/A'; }
+    else if (ing.buyCount>0 && ing.fromStorage>0) { sc='buy'; st=`Have ${ing.fromStorage}, buy ${ing.buyCount}`; }
+    else if (ing.buyCount>0)                      { sc='buy'; st=`Buy ${ing.buyCount}`; }
+    else                                           { sc='have'; st=`Have ${ing.have}`; }
     const ico = ing.icon ? `<img class="ing-icon" src="${ing.icon}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="ing-icon"></div>`;
     const buyStr = ing.buyCount>0&&ing.unitPrice>0 ? `<span class="ing-buy" style="color:var(--blue)">${formatCopper(ing.unitPrice*ing.buyCount)}</span>` : '';
     return `<div class="ingredient-row">${ico}<span class="ing-name">${escHtml(ing.name)}</span><span class="ing-count">×${ing.need}</span>${buyStr}<span class="ing-status ${sc}">${st}</span></div>`;
   }).join('');
 
-  const pl = r.profitVsRaw>=0?'profit-positive':'profit-negative';
+  const pl = r.profitVsRaw >= 0 ? 'profit-positive' : 'profit-negative';
   const detail = `<div class="recipe-detail">
     <div class="recipe-detail-top">
-      <div class="detail-section"><h4>Ingredients (×${r.outputCount} output)</h4>${ingRows||'<span style="color:var(--text-muted);font-size:12px;">No data</span>'}</div>
-      <div class="detail-section"><h4>Price Breakdown</h4><div class="price-breakdown">
-        <div class="price-row"><span class="price-row-label">Sell instant (after 15% tax)</span><span class="price-row-value">${r.fmt.sellInstantAfterFees}</span></div>
-        <div class="price-row"><span class="price-row-label">Sell listing (after 15% tax)</span><span class="price-row-value" style="color:var(--text-secondary)">${r.fmt.sellListAfterFees}</span></div>
-        <div class="price-row"><span class="price-row-label">Mats to buy from TP</span><span class="price-row-value" style="color:${r.matCostToBuy>0?'var(--red)':'var(--text-muted)'}">${r.matCostToBuy>0?r.fmt.matCostToBuy:'—'}</span></div>
-        <div class="price-row total"><span class="price-row-label">Profit vs selling mats raw</span><span class="price-row-value ${pl}">${r.fmt.profitVsRaw}</span></div>
-        <div class="price-row total"><span class="price-row-label">Cash profit (sell − buy only)</span><span class="price-row-value ${r.profitAbsolute>=0?'profit-positive':'profit-negative'}">${r.fmt.profitAbsolute}</span></div>
-        <div class="price-row"><span class="price-row-label">Profit margin</span><span class="price-row-value">${r.profitMargin}%</span></div>
-        ${maxC!==null?`<div class="price-row total" style="margin-top:4px;border-top:1px solid var(--border)"><span class="price-row-label">Max craftable from storage</span><span class="price-row-value" style="color:var(--green)">×${maxC}</span></div>
-        <div class="price-row"><span class="price-row-label">Total profit if all crafted</span><span class="price-row-value ${r.profitVsRaw>=0?'profit-positive':'profit-negative'}">${formatCopper(r.profitVsRaw*maxC)}</span></div>`:''}
+      <div class="detail-section"><h4>Ingredients (×${r.outputCount} crafted)</h4>${ingRows||'<span style="color:var(--text-muted);font-size:12px;">No data</span>'}</div>
+      <div class="detail-section"><h4>Breakdown</h4><div class="price-breakdown">
+        <div class="price-row"><span class="price-row-label">Sell to buy order (after 15% tax)</span><span class="price-row-value">${r.fmt.sellInstantAfterFees}</span></div>
+        <div class="price-row"><span class="price-row-label">Sell by listing (after 15% tax)</span><span class="price-row-value" style="color:var(--text-secondary)">${r.fmt.sellListAfterFees}</span></div>
+        <div class="price-row" style="margin-top:6px;border-top:1px solid var(--border-light);padding-top:6px"><span class="price-row-label">Ingredients (market value)</span><span class="price-row-value">${formatCopper(ingredientValue)}</span></div>
+        <div class="price-row" style="padding-left:10px"><span class="price-row-label" style="font-size:11px">↳ In your storage</span><span class="price-row-value" style="color:var(--green);font-size:11px">${formatCopper(r.matCostFromStorage)}</span></div>
+        <div class="price-row" style="padding-left:10px"><span class="price-row-label" style="font-size:11px">↳ Need to buy</span><span class="price-row-value" style="color:${r.matCostToBuy>0?'var(--red)':'var(--text-muted)'};font-size:11px">${r.matCostToBuy>0?r.fmt.matCostToBuy:'—'}</span></div>
+        <div class="price-row total" style="margin-top:6px;border-top:1px solid var(--border)"><span class="price-row-label">Profit</span><span class="price-row-value ${pl}">${r.fmt.profitVsRaw}</span></div>
+        <div class="price-row"><span class="price-row-label">Margin</span><span class="price-row-value">${r.profitMargin}%</span></div>
+        ${maxC!==null?`<div class="price-row" style="margin-top:6px;border-top:1px solid var(--border-light);padding-top:6px"><span class="price-row-label">Can craft ×${maxC} from storage</span><span class="price-row-value" style="color:var(--green)">total ${formatCopper(r.profitVsRaw*maxC)}</span></div>`:''}
       </div></div>
     </div>
     <div class="recipe-detail-market" id="mkt-${r.recipeId}"></div>
@@ -369,11 +384,11 @@ function renderCraftCard(r) {
       ${icon}
       <div class="item-name-wrap">
         <div class="item-name ${r.outputRarity}">${escHtml(r.outputItemName)}</div>
-        <div class="item-meta">${discs}${liqTag}${!r.isFullyCraftable?'<span class="tag tag-partial">Buy mats</span>':''}${!r.unlocked?'<span class="tag tag-locked">Recipe sheet</span>':''}${maxC!==null?`<span class="tag tag-green">×${maxC} max</span>`:''}</div>
+        <div class="item-meta">${discs}${liqTag}${!r.unlocked?'<span class="tag tag-locked">Recipe sheet</span>':''}${maxC!==null?`<span class="tag tag-green">×${maxC} max</span>`:''}</div>
       </div>
-      <div class="col-sell"><div class="col-label">Sell instant</div><div class="col-value">${r.fmt.sellInstantAfterFees}</div></div>
-      <div class="col-cost"><div class="col-label">Buy cost</div><div class="col-value" style="color:${r.matCostToBuy>0?'var(--red)':'var(--text-muted)'}">${r.matCostToBuy>0?r.fmt.matCostToBuy:'—'}</div></div>
-      <div class="col-profit"><div class="col-label">vs Raw</div><div class="col-value${profCls}">${r.fmt.profitVsRaw}</div></div>
+      <div class="col-sell"><div class="col-label">Sells for</div><div class="col-value">${r.fmt.sellInstantAfterFees}</div>${listingHint}</div>
+      <div class="col-cost"><div class="col-label">Craft cost</div><div class="col-value">${formatCopper(ingredientValue)}</div>${craftNote}</div>
+      <div class="col-profit"><div class="col-label">Profit</div><div class="col-value${profCls}">${r.fmt.profitVsRaw}</div></div>
       <span class="expand-icon">▼</span>
     </div>${detail}</div>`;
 }
