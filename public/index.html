@@ -219,7 +219,16 @@
   .recipe-card.expanded .expand-icon { transform: rotate(180deg); }
 
   .recipe-detail { display: none; border-top: 1px solid var(--border-light); padding: 12px; }
-  .recipe-card.expanded .recipe-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .recipe-card.expanded .recipe-detail { display: block; }
+  .recipe-detail-top { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .recipe-detail-market { border-top: 1px solid var(--border-light); padding-top: 10px; margin-top: 12px; }
+  .market-section h4 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gold); margin-bottom: 8px; }
+  .market-spark { margin-bottom: 8px; }
+  .market-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .mstat { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--border-light); }
+  .mstat:last-child { border-bottom: none; }
+  .mstat-label { color: var(--text-secondary); }
+  .mstat-value { font-family: var(--font-data); font-size: 11px; }
 
   .detail-section h4 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gold); margin-bottom: 8px; }
 
@@ -263,6 +272,15 @@
   .salvage-detail { display: none; border-top: 1px solid var(--border-light); padding: 12px; }
   .salvage-card.expanded .salvage-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
+
+  /* ── Liquidity indicators ── */
+  .liq-tag { font-weight: 600; }
+  .liq-liquid { background: rgba(63,185,80,0.12);  color: var(--green); }
+  .liq-slow   { background: rgba(227,168,74,0.15); color: var(--orange); }
+  .liq-stale  { background: rgba(248,81,73,0.12);  color: var(--red); }
+  .recipe-card.liq-liquid { border-left: 3px solid var(--green); }
+  .recipe-card.liq-slow   { border-left: 3px solid var(--orange); }
+  .recipe-card.liq-stale  { border-left: 3px solid var(--red); }
 
   /* ── Kit selector ── */
   .kit-list { display: flex; flex-direction: column; gap: 4px; }
@@ -373,6 +391,7 @@
             <option value="profitAbsolute">Cash profit (sell − buy cost)</option>
             <option value="sellInstantAfterFees">Sell value (instant)</option>
             <option value="matCostToBuy">Buy cost (ascending)</option>
+            <option value="spread">Liquidity (tightest spread first)</option>
           </select>
         </div>
         <button class="btn btn-primary btn-full btn-run" id="analyzeBtn">⚒ Analyze Crafts</button>

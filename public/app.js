@@ -30,6 +30,7 @@ const state = {
   hideUnowned: false,
   craftResults: [],
   sortKey: 'profitVsRaw',
+  historyCache: {}, // outputItemId → [{t,b,s}] — populated after analyze
   // Salvage
   includeBank: true,
   includeBags: true,
@@ -205,7 +206,14 @@ async function runCraftAnalysis() {
 
 function renderCraftResults(results, total) {
   let filtered = state.hideUnowned ? results.filter(r => r.unlocked || r.isFullyCraftable) : results;
-  const sorted = [...filtered].sort((a,b) => state.sortKey === 'matCostToBuy' ? a[state.sortKey]-b[state.sortKey] : b[state.sortKey]-a[state.sortKey]);
+  const sorted = [...filtered].sort((a,b) => {
+    if (state.sortKey === 'matCostToBuy') return a[state.sortKey] - b[state.sortKey];
+    if (state.sortKey === 'spread') {
+      const sp = r => r.sellList > 0 ? (r.sellList - r.sellInstant) / r.sellList : 1;
+      return sp(a) - sp(b);
+    }
+    return b[state.sortKey] - a[state.sortKey];
+  });
   const full    = sorted.filter(r => r.isFullyCraftable);
   const partial = sorted.filter(r => !r.isFullyCraftable);
 
@@ -236,8 +244,23 @@ function renderCraftResults(results, total) {
   }
 
   setTabContent('crafts', html);
+
+  const resultMap = {};
+  sorted.forEach(r => resultMap[r.recipeId] = r);
+
   document.querySelectorAll('#tabpanel-crafts .recipe-header').forEach(h => {
-    h.addEventListener('click', () => h.closest('.recipe-card').classList.toggle('expanded'));
+    h.addEventListener('click', () => {
+      const card = h.closest('.recipe-card');
+      card.classList.toggle('expanded');
+      if (card.classList.contains('expanded')) {
+        const mktDiv = document.getElementById(`mkt-${card.dataset.id}`);
+        if (mktDiv && !mktDiv.dataset.loaded) {
+          const r = resultMap[parseInt(card.dataset.id)];
+          if (r) renderMarketDetail(mktDiv, r, state.historyCache[r.outputItemId] || []);
+          mktDiv.dataset.loaded = '1';
+        }
+      }
+    });
   });
 
   // Fetch 7-day trend data for output items and annotate cards
@@ -251,32 +274,56 @@ async function fetchAndApplyTrends(results) {
     const data    = await apiFetch('/api/history/batch', { itemIds, days: 7 });
     const history = data.history || {};
 
+    // Cache for use in expanded market detail panels
+    Object.assign(state.historyCache, history);
+
     results.forEach(r => {
-      const h = history[r.outputItemId];
+      const h          = history[r.outputItemId];
+      const snapCount  = h ? h.length : 0;
+      const spreadPct  = r.sellList > 0 ? Math.round((r.sellList - r.sellInstant) / r.sellList * 100) : null;
+
+      // Refine the liquidity tag now that we have activity data
+      const liqEl = document.querySelector(`[data-liq="${r.recipeId}"]`);
+      if (liqEl) {
+        if (snapCount === 0) {
+          // No price movement recorded at all — likely stale regardless of spread
+          if (liqEl.classList.contains('liq-liquid')) {
+            liqEl.classList.replace('liq-liquid', 'liq-slow');
+            liqEl.textContent = '● Slow';
+            const card = liqEl.closest('.recipe-card');
+            if (card) { card.classList.remove('liq-liquid'); card.classList.add('liq-slow'); }
+          }
+          liqEl.title = `Spread ${spreadPct ?? '?'}% · No price movement recorded yet`;
+        } else {
+          // Tight spread but barely any movement → downgrade to slow
+          if (liqEl.classList.contains('liq-liquid') && snapCount <= 2) {
+            liqEl.classList.replace('liq-liquid', 'liq-slow');
+            liqEl.textContent = '● Slow';
+            const card = liqEl.closest('.recipe-card');
+            if (card) { card.classList.remove('liq-liquid'); card.classList.add('liq-slow'); }
+          }
+          liqEl.title = `Spread ${spreadPct ?? '?'}% · ${snapCount} price changes in 7d`;
+        }
+      }
+
+      // Trend badge (direction arrow)
       if (!h || h.length < 2) return;
-
-      const first   = h[0].s;   // sell price at start of period
-      const last    = h[h.length-1].s; // sell price at end
+      const first = h[0].s, last = h[h.length-1].s;
       if (!first || !last) return;
-
-      const pct     = ((last - first) / first * 100);
-      const absPct  = Math.abs(pct).toFixed(1);
-      const isUp    = pct > 1;
-      const isDown  = pct < -1;
-      if (!isUp && !isDown) return; // flat — don't clutter UI
+      const pct    = ((last - first) / first * 100);
+      const absPct = Math.abs(pct).toFixed(1);
+      const isUp   = pct > 1, isDown = pct < -1;
+      if (!isUp && !isDown) return;
 
       const arrow = isUp ? '↑' : '↓';
       const color = isUp ? 'var(--green)' : 'var(--red)';
-      const label = `${arrow} ${absPct}% 7d`;
-
-      // Find the card and inject the trend badge into item-meta
-      const card = document.querySelector(`[data-id="${r.recipeId}"] .item-meta`);
+      const card  = document.querySelector(`[data-id="${r.recipeId}"] .item-meta`);
       if (card) {
         const badge = document.createElement('span');
         badge.className = 'tag';
         badge.style.cssText = `background:transparent;color:${color};font-weight:600;`;
         badge.title = `Sell price ${isUp ? 'up' : 'down'} ${absPct}% over last 7 days`;
-        badge.textContent = label;
+        badge.textContent = `${arrow} ${absPct}% 7d`;
         card.appendChild(badge);
       }
     });
@@ -293,6 +340,20 @@ function renderCraftCard(r) {
   const discs   = r.disciplines.slice(0,2).map(d=>`<span class="tag tag-disc">${d}</span>`).join('');
   const maxC    = r.isFullyCraftable ? calcMaxCraftable(r) : null;
 
+  // Liquidity: classify by buy/sell spread (synchronous — refined async after history loads)
+  const spreadFrac = r.sellList > 0 ? (r.sellList - r.sellInstant) / r.sellList : null;
+  const spreadPct  = spreadFrac !== null ? Math.round(spreadFrac * 100) : null;
+  const liqTier    = spreadPct === null ? null : spreadPct < 15 ? 'liquid' : spreadPct < 35 ? 'slow' : 'stale';
+  const liqLabels  = { liquid: '● Liquid', slow: '● Slow', stale: '● Stale' };
+  const liqTitles  = {
+    liquid: `Spread ${spreadPct}% — tight market, likely sells quickly`,
+    slow:   `Spread ${spreadPct}% — moderate activity`,
+    stale:  `Spread ${spreadPct}% — wide spread, may sit on TP`,
+  };
+  const liqTag = liqTier
+    ? `<span class="tag liq-tag liq-${liqTier}" data-liq="${r.recipeId}" title="${liqTitles[liqTier]}">${liqLabels[liqTier]}</span>`
+    : '';
+
   const ingRows = r.allIngredients.map(ing => {
     let sc, st;
     if (ing.unavailable)                        { sc='missing'; st='N/A'; }
@@ -306,25 +367,28 @@ function renderCraftCard(r) {
 
   const pl = r.profitVsRaw>=0?'profit-positive':'profit-negative';
   const detail = `<div class="recipe-detail">
-    <div class="detail-section"><h4>Ingredients (×${r.outputCount} output)</h4>${ingRows||'<span style="color:var(--text-muted);font-size:12px;">No data</span>'}</div>
-    <div class="detail-section"><h4>Price Breakdown</h4><div class="price-breakdown">
-      <div class="price-row"><span class="price-row-label">Sell instant (after 15% tax)</span><span class="price-row-value">${r.fmt.sellInstantAfterFees}</span></div>
-      <div class="price-row"><span class="price-row-label">Sell listing (after 15% tax)</span><span class="price-row-value" style="color:var(--text-secondary)">${r.fmt.sellListAfterFees}</span></div>
-      <div class="price-row"><span class="price-row-label">Mats to buy from TP</span><span class="price-row-value" style="color:${r.matCostToBuy>0?'var(--red)':'var(--text-muted)'}">${r.matCostToBuy>0?r.fmt.matCostToBuy:'—'}</span></div>
-      <div class="price-row total"><span class="price-row-label">Profit vs selling mats raw</span><span class="price-row-value ${pl}">${r.fmt.profitVsRaw}</span></div>
-      <div class="price-row total"><span class="price-row-label">Cash profit (sell − buy only)</span><span class="price-row-value ${r.profitAbsolute>=0?'profit-positive':'profit-negative'}">${r.fmt.profitAbsolute}</span></div>
-      <div class="price-row"><span class="price-row-label">Profit margin</span><span class="price-row-value">${r.profitMargin}%</span></div>
-      ${maxC!==null?`<div class="price-row total" style="margin-top:4px;border-top:1px solid var(--border)"><span class="price-row-label">Max craftable from storage</span><span class="price-row-value" style="color:var(--green)">×${maxC}</span></div>
-      <div class="price-row"><span class="price-row-label">Total profit if all crafted</span><span class="price-row-value ${r.profitVsRaw>=0?'profit-positive':'profit-negative'}">${formatCopper(r.profitVsRaw*maxC)}</span></div>`:''}
-    </div></div>
+    <div class="recipe-detail-top">
+      <div class="detail-section"><h4>Ingredients (×${r.outputCount} output)</h4>${ingRows||'<span style="color:var(--text-muted);font-size:12px;">No data</span>'}</div>
+      <div class="detail-section"><h4>Price Breakdown</h4><div class="price-breakdown">
+        <div class="price-row"><span class="price-row-label">Sell instant (after 15% tax)</span><span class="price-row-value">${r.fmt.sellInstantAfterFees}</span></div>
+        <div class="price-row"><span class="price-row-label">Sell listing (after 15% tax)</span><span class="price-row-value" style="color:var(--text-secondary)">${r.fmt.sellListAfterFees}</span></div>
+        <div class="price-row"><span class="price-row-label">Mats to buy from TP</span><span class="price-row-value" style="color:${r.matCostToBuy>0?'var(--red)':'var(--text-muted)'}">${r.matCostToBuy>0?r.fmt.matCostToBuy:'—'}</span></div>
+        <div class="price-row total"><span class="price-row-label">Profit vs selling mats raw</span><span class="price-row-value ${pl}">${r.fmt.profitVsRaw}</span></div>
+        <div class="price-row total"><span class="price-row-label">Cash profit (sell − buy only)</span><span class="price-row-value ${r.profitAbsolute>=0?'profit-positive':'profit-negative'}">${r.fmt.profitAbsolute}</span></div>
+        <div class="price-row"><span class="price-row-label">Profit margin</span><span class="price-row-value">${r.profitMargin}%</span></div>
+        ${maxC!==null?`<div class="price-row total" style="margin-top:4px;border-top:1px solid var(--border)"><span class="price-row-label">Max craftable from storage</span><span class="price-row-value" style="color:var(--green)">×${maxC}</span></div>
+        <div class="price-row"><span class="price-row-label">Total profit if all crafted</span><span class="price-row-value ${r.profitVsRaw>=0?'profit-positive':'profit-negative'}">${formatCopper(r.profitVsRaw*maxC)}</span></div>`:''}
+      </div></div>
+    </div>
+    <div class="recipe-detail-market" id="mkt-${r.recipeId}"></div>
   </div>`;
 
-  return `<div class="recipe-card" data-id="${r.recipeId}">
+  return `<div class="recipe-card${liqTier ? ` liq-${liqTier}` : ''}" data-id="${r.recipeId}" data-output-id="${r.outputItemId}">
     <div class="recipe-header">
       ${icon}
       <div class="item-name-wrap">
         <div class="item-name ${r.outputRarity}">${escHtml(r.outputItemName)}</div>
-        <div class="item-meta">${discs}${!r.isFullyCraftable?'<span class="tag tag-partial">Buy mats</span>':''}${!r.unlocked?'<span class="tag tag-locked">Recipe sheet</span>':''}${maxC!==null?`<span class="tag tag-green">×${maxC} max</span>`:''}</div>
+        <div class="item-meta">${discs}${liqTag}${!r.isFullyCraftable?'<span class="tag tag-partial">Buy mats</span>':''}${!r.unlocked?'<span class="tag tag-locked">Recipe sheet</span>':''}${maxC!==null?`<span class="tag tag-green">×${maxC} max</span>`:''}</div>
       </div>
       <div class="col-sell"><div class="col-label">Sell instant</div><div class="col-value">${r.fmt.sellInstantAfterFees}</div></div>
       <div class="col-cost"><div class="col-label">Buy cost</div><div class="col-value" style="color:${r.matCostToBuy>0?'var(--red)':'var(--text-muted)'}">${r.matCostToBuy>0?r.fmt.matCostToBuy:'—'}</div></div>
@@ -494,6 +558,67 @@ async function viewMaterials() {
     html += `</div>`;
     setTabContent('crafts', html);
   } catch(e) { showTabBanner('crafts','err',`Failed: ${e.message}`); }
+}
+
+// ── Market detail (expanded panel) ───────────────────────────────────────────
+
+function makeSpark(points, w = 120, h = 28) {
+  if (!points || points.length < 2) return '';
+  const vals = points.map(p => p.s).filter(Boolean);
+  if (vals.length < 2) return '';
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const xs = vals.map((_, i) => (i / (vals.length - 1)) * w);
+  const ys = vals.map(v => h - 2 - ((v - min) / range) * (h - 4));
+  const d  = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const isUp  = vals[vals.length - 1] >= vals[0];
+  const color = isUp ? 'var(--green)' : 'var(--red)';
+  const lx = xs[xs.length - 1].toFixed(1), ly = ys[ys.length - 1].toFixed(1);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;display:block;">
+    <path d="${d}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="${lx}" cy="${ly}" r="2.5" fill="${color}"/>
+  </svg>`;
+}
+
+function renderMarketDetail(el, r, history) {
+  const spreadPct  = r.sellList > 0 ? Math.round((r.sellList - r.sellInstant) / r.sellList * 100) : null;
+  const snapCount  = history.length;
+  const hasData    = snapCount >= 2;
+  const sellPrices = history.map(p => p.s).filter(Boolean);
+  const sellMin    = hasData ? Math.min(...sellPrices) : null;
+  const sellMax    = hasData ? Math.max(...sellPrices) : null;
+  const sellAvg    = hasData ? Math.round(sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length) : null;
+  const spark      = makeSpark(history);
+  const spreadColor = spreadPct === null ? 'var(--text-muted)'
+    : spreadPct < 15 ? 'var(--green)' : spreadPct < 35 ? 'var(--orange)' : 'var(--red)';
+
+  el.innerHTML = `<div class="market-section">
+    <h4>Market Activity (7d)</h4>
+    ${spark ? `<div class="market-spark">${spark}</div>` : ''}
+    <div class="market-stats">
+      <div class="mstat">
+        <span class="mstat-label">Buy/sell spread</span>
+        <span class="mstat-value" style="color:${spreadColor}">${spreadPct ?? '?'}%</span>
+      </div>
+      <div class="mstat">
+        <span class="mstat-label">Price changes (7d)</span>
+        <span class="mstat-value">${snapCount > 0 ? snapCount : '—'}</span>
+      </div>
+      ${hasData
+        ? `<div class="mstat">
+             <span class="mstat-label">7d sell range</span>
+             <span class="mstat-value">${formatCopperPlain(sellMin)} – ${formatCopperPlain(sellMax)}</span>
+           </div>
+           <div class="mstat">
+             <span class="mstat-label">7d avg sell</span>
+             <span class="mstat-value">${formatCopperPlain(sellAvg)}</span>
+           </div>`
+        : `<div class="mstat" style="grid-column:span 2">
+             <span class="mstat-label">History</span>
+             <span class="mstat-value" style="color:var(--text-muted)">Building — check back in a few hours</span>
+           </div>`}
+    </div>
+  </div>`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
