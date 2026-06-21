@@ -193,6 +193,7 @@ async function runCraftAnalysis() {
       includePartial: state.includePartial,
       maxMissingCost: Math.round((parseFloat(document.getElementById('maxBuyInput').value)||100) * 10000),
       limit: parseInt(document.getElementById('limitInput').value)||100,
+      hideUnowned: state.hideUnowned,
     });
     state.craftResults = data.results;
     renderCraftResults(data.results, data.total);

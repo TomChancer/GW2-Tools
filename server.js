@@ -35,7 +35,7 @@ app.post('/api/validate-key', async (req, res) => {
 
 // ── Craft analysis ────────────────────────────────────────────────────────────
 app.post('/api/analyze', async (req, res) => {
-  const { apiKey, disciplines=[], minProfit=1, includePartial=true, maxMissingCost=10000000, limit=100 } = req.body;
+  const { apiKey, disciplines=[], minProfit=1, includePartial=true, maxMissingCost=10000000, limit=100, hideUnowned=false } = req.body;
   if (!apiKey) return res.status(400).json({ error:'apiKey required' });
   if (!db.getMeta('seeded_at')) return res.status(503).json({ error:'Database not seeded. Run: node seed.js' });
 
@@ -43,7 +43,8 @@ app.post('/api/analyze', async (req, res) => {
     const [materials, unlockedRecipes] = await Promise.all([
       getAccountMaterials(apiKey), getAccountRecipes(apiKey)
     ]);
-    const results = await calcProfitableRecipes(materials.filter(m=>m.count>0), unlockedRecipes, { disciplines, minProfit, includePartial, maxMissingCost });
+    let results = await calcProfitableRecipes(materials.filter(m=>m.count>0), unlockedRecipes, { disciplines, minProfit, includePartial, maxMissingCost });
+    if (hideUnowned) results = results.filter(r => r.unlocked || r.isFullyCraftable);
     const formatted = results.slice(0, limit).map(r => ({
       ...r,
       fmt: {
