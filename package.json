@@ -1,0 +1,15 @@
+{
+  "name": "gw2-craft-profit",
+  "version": "1.0.0",
+  "description": "GW2 crafting profit calculator using material storage",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "sql.js": "^1.12.0"
+  }
+}

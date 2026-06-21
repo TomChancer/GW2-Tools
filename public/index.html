@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GW2 Tools</title>
+<style>
+  :root {
+    --bg-deep:      #0d1117;
+    --bg-panel:     #161b22;
+    --bg-elevated:  #1c2330;
+    --bg-input:     #0d1117;
+    --border:       #30363d;
+    --border-light: #21262d;
+    --text-primary:   #e6d9c3;
+    --text-secondary: #8b949e;
+    --text-muted:     #484f58;
+    --gold:         #c8a45a;
+    --gold-dim:     #7a6138;
+    --gold-glow:    rgba(200, 164, 90, 0.15);
+    --green:        #3fb950;
+    --green-dim:    #1a4023;
+    --red:          #f85149;
+    --red-dim:      #4a1a18;
+    --blue:         #58a6ff;
+    --orange:       #e3a84a;
+    --purple:       #9b38f7;
+    --rarity-basic:      #aaaaaa;
+    --rarity-fine:       #4e9fdf;
+    --rarity-masterwork: #67a833;
+    --rarity-rare:       #fcd00b;
+    --rarity-exotic:     #ffa405;
+    --rarity-ascended:   #fb3e8d;
+    --rarity-legendary:  #9b38f7;
+    --font-ui:   'Segoe UI', system-ui, sans-serif;
+    --font-data: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    --radius: 6px;
+    --radius-sm: 3px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg-deep); color: var(--text-primary); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; overflow: hidden; }
+
+  /* ── App shell ── */
+  .app { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 52px;
+    flex-shrink: 0;
+  }
+
+  .logo { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; color: var(--gold); letter-spacing: 0.02em; flex-shrink: 0; }
+
+  /* ── Tab nav ── */
+  .tabnav {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    height: 42px;
+    flex-shrink: 0;
+  }
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .tab .tab-icon { font-size: 15px; }
+
+  .tab-soon {
+    display: flex; align-items: center; gap: 7px;
+    padding: 0 16px; font-size: 13px; font-weight: 500;
+    color: var(--text-muted); cursor: default; user-select: none;
+  }
+  .tab-soon .badge { font-size: 9px; padding: 1px 5px; border-radius: 10px; background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .header-status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+  .status-dot.ok   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.warn { background: var(--gold); }
+  .status-dot.err  { background: var(--red); }
+
+  /* ── Main layout ── */
+  .main { display: grid; grid-template-columns: 280px 1fr; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar { background: var(--bg-panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+  .sidebar-section { display: flex; flex-direction: column; gap: 8px; }
+  .sidebar-section h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); padding-bottom: 6px; border-bottom: 1px solid var(--border-light); }
+
+  label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 3px; }
+  input[type="text"], input[type="password"], input[type="number"], select {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text-primary); padding: 6px 10px; font-size: 13px; font-family: var(--font-ui); outline: none; transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--gold); }
+  input[type="password"] { font-family: var(--font-data); letter-spacing: 0.08em; }
+
+  .key-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+  .key-status { font-size: 11px; padding: 4px 8px; border-radius: var(--radius-sm); display: none; }
+  .key-status.ok  { background: var(--green-dim); color: var(--green); display: block; }
+  .key-status.err { background: var(--red-dim);   color: var(--red);   display: block; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; font-family: var(--font-ui); cursor: pointer; transition: all 0.15s; border: none; white-space: nowrap; }
+  .btn-primary { background: var(--gold); color: #0d1117; }
+  .btn-primary:hover:not(:disabled) { background: #d4b068; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+  .btn-ghost:hover { border-color: var(--gold-dim); color: var(--gold); }
+  .btn-full { width: 100%; }
+  .btn-run { font-size: 14px; padding: 9px 16px; font-weight: 600; }
+
+  .disc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+  .disc-check { display: flex; align-items: center; justify-content: center; padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); cursor: pointer; user-select: none; font-size: 12px; color: var(--text-secondary); transition: all 0.15s; }
+  .disc-check:hover { border-color: var(--gold-dim); color: var(--text-primary); }
+  .disc-check.checked { border-color: var(--gold); background: var(--gold-glow); color: var(--gold); font-weight: 500; }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 3px 0; }
+  .toggle-label { font-size: 12px; color: var(--text-secondary); }
+  .toggle { width: 34px; height: 18px; border-radius: 9px; background: var(--border); position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: white; top: 3px; left: 3px; transition: transform 0.2s; }
+  .toggle.on { background: var(--gold); }
+  .toggle.on::after { transform: translateX(16px); }
+
+  .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* Tab panels in sidebar */
+  .sidebar-panel { display: none; flex-direction: column; gap: 16px; }
+  .sidebar-panel.active { display: flex; }
+
+  /* ── Content area ── */
+  .content { overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; position: relative; }
+
+  .tab-panel { display: none; flex-direction: column; gap: 12px; }
+  .tab-panel.active { display: flex; }
+
+  /* ── Empty/loading ── */
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 300px; color: var(--text-muted); text-align: center; }
+  .empty-state p { max-width: 280px; font-size: 13px; line-height: 1.6; }
+
+  .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-state { display: flex; flex-direction: column; align-items: center; gap: 12px; min-height: 200px; justify-content: center; }
+  .loading-text { color: var(--text-secondary); font-size: 13px; }
+
+  /* ── Results shared ── */
+  .results-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .results-header h2 { font-size: 15px; font-weight: 600; }
+  .results-meta { font-size: 12px; color: var(--text-secondary); }
+
+  .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); padding: 4px 0; border-bottom: 1px solid var(--border-light); margin-top: 4px; }
+
+  .banner { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; border-left: 3px solid; }
+  .banner.warn { background: rgba(200,164,90,0.1); border-color: var(--gold); color: var(--gold); }
+  .banner.err  { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+  .banner.info { background: rgba(88,166,255,0.1); border-color: var(--blue); color: var(--blue); }
+
+  /* ── Craft cards ── */
+  .recipe-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .recipe-card { background: var(--bg-panel); border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden; transition: border-color 0.15s; }
+  .recipe-card:hover { border-color: var(--border); }
+  .recipe-card.expanded { border-color: var(--gold-dim); }
+
+  .recipe-header { display: grid; grid-template-columns: 40px 1fr auto auto auto auto; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; }
+
+  .item-icon { width: 34px; height: 34px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg-elevated); border: 1px solid var(--border); flex-shrink: 0; }
+  .item-icon-placeholder { width: 34px; height: 34px; border-radius: var(--radius-sm); background: var(--bg-elevated); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+
+  .item-name-wrap { min-width: 0; }
+  .item-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-name.Basic      { color: var(--rarity-basic); }
+  .item-name.Fine       { color: var(--rarity-fine); }
+  .item-name.Masterwork { color: var(--rarity-masterwork); }
+  .item-name.Rare       { color: var(--rarity-rare); }
+  .item-name.Exotic     { color: var(--rarity-exotic); }
+  .item-name.Ascended   { color: var(--rarity-ascended); }
+  .item-name.Legendary  { color: var(--rarity-legendary); }
+
+  .item-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 4px; align-items: center; margin-top: 1px; flex-wrap: wrap; }
+  .tag { display: inline-flex; align-items: center; padding: 1px 5px; border-radius: 2px; font-size: 10px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+  .tag-partial { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .tag-locked  { background: rgba(248,81,73,0.12);  color: var(--red); }
+  .tag-disc    { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border); }
+  .tag-green   { background: rgba(63,185,80,0.12); color: var(--green); }
+  .tag-gold    { background: var(--gold-glow); color: var(--gold); }
+
+  .col-sell, .col-cost, .col-profit { text-align: right; min-width: 85px; flex-shrink: 0; }
+  .col-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .col-value { font-family: var(--font-data); font-size: 12px; font-weight: 600; }
+  .col-profit .col-value { color: var(--green); }
+  .col-profit .col-value.negative { color: var(--red); }
+  .col-profit .col-value.zero { color: var(--text-muted); }
+
+  .expand-icon { color: var(--text-muted); transition: transform 0.2s; flex-shrink: 0; font-size: 11px; }
+  .recipe-card.expanded .expand-icon { transform: rotate(180deg); }
+
+  .recipe-detail { display: none; border-top: 1px solid var(--border-light); padding: 12px; }
+  .recipe-card.expanded .recipe-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .detail-section h4 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gold); margin-bottom: 8px; }
+
+  .ingredient-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border-light); font-size: 12px; }
+  .ingredient-row:last-child { border-bottom: none; }
+  .ing-icon { width: 22px; height: 22px; border-radius: 2px; object-fit: cover; background: var(--bg-elevated); flex-shrink: 0; }
+  .ing-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ing-count { font-family: var(--font-data); color: var(--text-secondary); white-space: nowrap; font-size: 11px; }
+  .ing-buy { font-family: var(--font-data); font-size: 11px; white-space: nowrap; }
+  .ing-status { font-size: 10px; padding: 1px 5px; border-radius: 2px; flex-shrink: 0; }
+  .ing-status.have    { background: var(--green-dim); color: var(--green); }
+  .ing-status.buy     { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .ing-status.missing { background: var(--red-dim); color: var(--red); }
+
+  .price-breakdown { display: flex; flex-direction: column; }
+  .price-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--border-light); }
+  .price-row:last-child { border-bottom: none; }
+  .price-row.total { font-weight: 600; }
+  .price-row-label { color: var(--text-secondary); }
+  .price-row-value { font-family: var(--font-data); }
+  .profit-positive { color: var(--green); }
+  .profit-negative { color: var(--red); }
+
+  /* ── Salvage cards ── */
+  .salvage-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .salvage-card { background: var(--bg-panel); border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden; transition: border-color 0.15s; }
+  .salvage-card:hover { border-color: var(--border); }
+  .salvage-card.expanded { border-color: var(--gold-dim); }
+  .salvage-card.action-sell   { border-left: 3px solid var(--green); }
+  .salvage-card.action-salvage { border-left: 3px solid var(--orange); }
+  .salvage-card.action-extract { border-left: 3px solid var(--purple); }
+
+  .salvage-header { display: grid; grid-template-columns: 40px 1fr auto auto auto auto; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; }
+
+  .action-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; flex-shrink: 0; }
+  .action-badge.sell    { background: rgba(63,185,80,0.15);  color: var(--green); }
+  .action-badge.salvage { background: rgba(227,168,74,0.15); color: var(--orange); }
+  .action-badge.extract { background: rgba(155,56,247,0.15); color: var(--purple); }
+
+  .salvage-detail { display: none; border-top: 1px solid var(--border-light); padding: 12px; }
+  .salvage-card.expanded .salvage-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+
+  /* ── Kit selector ── */
+  .kit-list { display: flex; flex-direction: column; gap: 4px; }
+  .kit-option {
+    display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+    gap: 0 8px; align-items: center;
+    padding: 7px 10px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); cursor: pointer;
+    transition: border-color 0.15s; user-select: none; font-size: 12px;
+  }
+  .kit-option:hover { border-color: var(--border); }
+  .kit-option input[type="checkbox"] { grid-row: span 2; accent-color: var(--gold); width: 14px; height: 14px; cursor: pointer; }
+  .kit-option input[type="checkbox"]:checked ~ .kit-info { color: var(--text-primary); }
+  .kit-option:has(input:checked) { border-color: var(--gold-dim); background: var(--gold-glow); }
+  .kit-info { display: flex; justify-content: space-between; align-items: center; }
+  .kit-name { font-weight: 500; color: var(--text-secondary); }
+  .kit-option:has(input:checked) .kit-name { color: var(--gold); }
+  .kit-cost { font-family: var(--font-data); font-size: 11px; color: var(--text-muted); }
+  .kit-note { font-size: 10px; color: var(--text-muted); grid-column: 2; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+      </svg>
+      GW2 Tools
+    </div>
+    <div class="header-status">
+      <div class="status-dot" id="dbStatusDot"></div>
+      <span id="dbStatusText">Checking…</span>
+    </div>
+  </div>
+
+  <!-- Tab nav -->
+  <div class="tabnav">
+    <div class="tab active" data-tab="crafts">
+      <span class="tab-icon">⚒</span> Crafting Profit
+    </div>
+    <div class="tab" data-tab="salvage">
+      <span class="tab-icon">🔨</span> Salvage Advisor
+    </div>
+    <div class="tab-soon">
+      <span class="tab-icon">📈</span> Flipping
+      <span class="badge">Soon</span>
+    </div>
+    <div class="tab-soon">
+      <span class="tab-icon">⚗️</span> Mystic Forge
+      <span class="badge">Soon</span>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+
+      <!-- Shared: API key -->
+      <div class="sidebar-section">
+        <h3>API Key</h3>
+        <div class="key-row">
+          <input type="password" id="apiKeyInput" placeholder="Paste your GW2 API key…" autocomplete="off"/>
+          <button class="btn btn-ghost" id="validateBtn">Test</button>
+        </div>
+        <div class="key-status" id="keyStatus"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+          Needs: <strong>inventories</strong>, <strong>unlocks</strong>
+        </div>
+      </div>
+
+      <!-- Crafts sidebar panel -->
+      <div class="sidebar-panel active" id="panel-crafts">
+        <div class="sidebar-section">
+          <h3>Disciplines</h3>
+          <div class="disc-grid" id="discGrid"></div>
+        </div>
+        <div class="sidebar-section">
+          <h3>Filters</h3>
+          <div class="toggle-row">
+            <span class="toggle-label">Include partial crafts</span>
+            <div class="toggle on" id="partialToggle"></div>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Show unowned recipe sheets</span>
+            <div class="toggle on" id="unownedToggle"></div>
+          </div>
+          <div class="filter-row" style="margin-top:4px;">
+            <div><label>Min profit (gold)</label><input type="number" id="minProfitInput" value="0.01" step="0.01" min="0"/></div>
+            <div><label>Max mat buy (gold)</label><input type="number" id="maxBuyInput" value="100" step="1" min="0"/></div>
+          </div>
+          <div><label>Results to show</label><input type="number" id="limitInput" value="100" step="10" min="10" max="500"/></div>
+        </div>
+        <div class="sidebar-section">
+          <h3>Sort by</h3>
+          <select id="sortSelect">
+            <option value="profitVsRaw">Profit vs selling raw</option>
+            <option value="profitAbsolute">Cash profit (sell − buy cost)</option>
+            <option value="sellInstantAfterFees">Sell value (instant)</option>
+            <option value="matCostToBuy">Buy cost (ascending)</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-full btn-run" id="analyzeBtn">⚒ Analyze Crafts</button>
+        <div style="margin-top:auto;">
+          <button class="btn btn-ghost btn-full" id="materialsBtn" style="font-size:12px;">View Material Storage</button>
+        </div>
+      </div>
+
+      <!-- Salvage sidebar panel -->
+      <div class="sidebar-panel" id="panel-salvage">
+
+        <div class="sidebar-section">
+          <h3>Kits You Own</h3>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Select your available kits — affects which recommendations are shown</div>
+          <div class="kit-list" id="kitList">
+            <label class="kit-option">
+              <input type="checkbox" id="kit-copper" checked>
+              <div class="kit-info">
+                <span class="kit-name">Copper-fed</span>
+                <span class="kit-cost">3c/use</span>
+              </div>
+              <span class="kit-note">Whites &amp; blues only</span>
+            </label>
+            <label class="kit-option">
+              <input type="checkbox" id="kit-silver" checked>
+              <div class="kit-info">
+                <span class="kit-name">Silver-fed</span>
+                <span class="kit-cost">60c/use</span>
+              </div>
+              <span class="kit-note">0.875 ectos/rare</span>
+            </label>
+            <label class="kit-option">
+              <input type="checkbox" id="kit-masters">
+              <div class="kit-info">
+                <span class="kit-name">Master's Kit</span>
+                <span class="kit-cost">~3c/use</span>
+              </div>
+              <span class="kit-note">Same as Silver-fed</span>
+            </label>
+            <label class="kit-option">
+              <input type="checkbox" id="kit-runecrafter">
+              <div class="kit-info">
+                <span class="kit-name">Runecrafter's</span>
+                <span class="kit-cost">30c/use</span>
+              </div>
+              <span class="kit-note">Destroys upgrades → motes</span>
+            </label>
+            <label class="kit-option">
+              <input type="checkbox" id="kit-blacklion">
+              <div class="kit-info">
+                <span class="kit-name">Black Lion Kit</span>
+                <span class="kit-cost" id="blKitCostDisplay">500c/use</span>
+              </div>
+              <span class="kit-note">Only recovers upgrades</span>
+            </label>
+          </div>
+          <div style="margin-top:8px;">
+            <label>Black Lion kit cost (copper)</label>
+            <input type="number" id="blKitCost" value="500" step="10" min="1"/>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Sources</h3>
+          <div class="toggle-row">
+            <span class="toggle-label">Include bank</span>
+            <div class="toggle on" id="bankToggle"></div>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Include character bags</span>
+            <div class="toggle on" id="bagsToggle"></div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Filters</h3>
+          <div class="toggle-row">
+            <span class="toggle-label">Only show profitable</span>
+            <div class="toggle on" id="profitableOnlyToggle"></div>
+          </div>
+          <div>
+            <label>Min rarity</label>
+            <select id="minRaritySelect">
+              <option value="2">Fine (blue)</option>
+              <option value="3" selected>Masterwork (green)</option>
+              <option value="4">Rare (yellow)</option>
+              <option value="5">Exotic (orange)</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-full btn-run" id="salvageBtn">🔨 Analyze Salvage</button>
+      </div>
+
+    </aside>
+
+    <!-- Content -->
+    <main class="content" id="content">
+
+      <!-- Crafts panel -->
+      <div class="tab-panel active" id="tabpanel-crafts">
+        <div class="empty-state">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+          <p>Enter your API key and click <strong>Analyze Crafts</strong> to find profitable recipes from your material storage.</p>
+        </div>
+      </div>
+
+      <!-- Salvage panel -->
+      <div class="tab-panel" id="tabpanel-salvage">
+        <div class="empty-state">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4">
+            <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
+          </svg>
+          <p>Click <strong>Analyze Salvage</strong> to see every equippable item in your inventory with a recommendation: sell, salvage, or extract the upgrade.</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
