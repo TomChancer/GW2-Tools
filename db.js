@@ -19,7 +19,21 @@ async function getDb() {
     _db = new _SQL.Database();
   }
   initSchema(_db);
+  migrateSchema(_db);
   return _db;
+}
+
+// Add columns that didn't exist in earlier versions — SQLite ignores errors if column already exists
+function migrateSchema(db) {
+  const migrations = [
+    'ALTER TABLE tp_prices ADD COLUMN buy_quantity  INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE tp_prices ADD COLUMN sell_quantity INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE price_history ADD COLUMN buy_quantity  INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE price_history ADD COLUMN sell_quantity INTEGER NOT NULL DEFAULT 0',
+  ];
+  for (const sql of migrations) {
+    try { db.run(sql); } catch (e) { /* column already exists */ }
+  }
 }
 
 function save() {
@@ -51,19 +65,23 @@ function initSchema(db) {
 
     -- Current price cache (fast lookup, always latest)
     CREATE TABLE IF NOT EXISTS tp_prices (
-      item_id    INTEGER PRIMARY KEY,
-      buy_price  INTEGER NOT NULL DEFAULT 0,
-      sell_price INTEGER NOT NULL DEFAULT 0,
-      updated_at INTEGER NOT NULL DEFAULT 0
+      item_id       INTEGER PRIMARY KEY,
+      buy_price     INTEGER NOT NULL DEFAULT 0,
+      sell_price    INTEGER NOT NULL DEFAULT 0,
+      buy_quantity  INTEGER NOT NULL DEFAULT 0,
+      sell_quantity INTEGER NOT NULL DEFAULT 0,
+      updated_at    INTEGER NOT NULL DEFAULT 0
     );
 
     -- Historical price snapshots: one row per item per hour, only on change
     -- snapped_at is the Unix timestamp of the hour boundary (e.g. 1718784000 = top of the hour)
     CREATE TABLE IF NOT EXISTS price_history (
-      item_id    INTEGER NOT NULL,
-      snapped_at INTEGER NOT NULL,
-      buy_price  INTEGER NOT NULL DEFAULT 0,
-      sell_price INTEGER NOT NULL DEFAULT 0,
+      item_id       INTEGER NOT NULL,
+      snapped_at    INTEGER NOT NULL,
+      buy_price     INTEGER NOT NULL DEFAULT 0,
+      sell_price    INTEGER NOT NULL DEFAULT 0,
+      buy_quantity  INTEGER NOT NULL DEFAULT 0,
+      sell_quantity INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (item_id, snapped_at)
     );
 
@@ -125,9 +143,9 @@ function getItemCount()   { return (queryOne('SELECT COUNT(*) as n FROM items') 
 function upsertPrices(prices) {
   const now  = Math.floor(Date.now() / 1000);
   const stmt = _db.prepare(`
-    INSERT OR REPLACE INTO tp_prices (item_id, buy_price, sell_price, updated_at)
-    VALUES (?, ?, ?, ?)`);
-  for (const p of prices) stmt.run([p.item_id, p.buy_price, p.sell_price, now]);
+    INSERT OR REPLACE INTO tp_prices (item_id, buy_price, sell_price, buy_quantity, sell_quantity, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)`);
+  for (const p of prices) stmt.run([p.item_id, p.buy_price, p.sell_price, p.buy_quantity||0, p.sell_quantity||0, now]);
   stmt.free();
   save();
 }
@@ -154,15 +172,15 @@ function recordHistoryIfChanged(prices) {
   const cutoff     = now - HISTORY_SECS;
 
   const insertStmt = _db.prepare(`
-    INSERT OR IGNORE INTO price_history (item_id, snapped_at, buy_price, sell_price)
-    VALUES (?, ?, ?, ?)`);
+    INSERT OR IGNORE INTO price_history (item_id, snapped_at, buy_price, sell_price, buy_quantity, sell_quantity)
+    VALUES (?, ?, ?, ?, ?, ?)`);
 
   let written = 0;
 
   for (const p of prices) {
     // Get the most recent history row for this item
     const last = queryOne(
-      `SELECT buy_price, sell_price, snapped_at FROM price_history
+      `SELECT buy_price, sell_price, buy_quantity, sell_quantity, snapped_at FROM price_history
        WHERE item_id = ? ORDER BY snapped_at DESC LIMIT 1`,
       [p.item_id]
     );
@@ -170,11 +188,19 @@ function recordHistoryIfChanged(prices) {
     // Skip if we already have a row for this hour
     if (last && last.snapped_at === hourBucket) continue;
 
-    // Skip if price hasn't changed since last snapshot
-    if (last && last.buy_price === p.buy_price && last.sell_price === p.sell_price) continue;
+    // Record if price changed
+    const priceChanged = !last || last.buy_price !== p.buy_price || last.sell_price !== p.sell_price;
 
-    // Write the snapshot
-    insertStmt.run([p.item_id, hourBucket, p.buy_price, p.sell_price]);
+    // Record if buy or sell quantity shifted by more than 25% (stock moving)
+    const prevBq = last ? (last.buy_quantity  || 0) : 0;
+    const prevSq = last ? (last.sell_quantity || 0) : 0;
+    const bqShift = prevBq > 0 ? Math.abs((p.buy_quantity||0)  - prevBq) / prevBq : 0;
+    const sqShift = prevSq > 0 ? Math.abs((p.sell_quantity||0) - prevSq) / prevSq : 0;
+    const qtyShifted = bqShift > 0.25 || sqShift > 0.25;
+
+    if (!priceChanged && !qtyShifted) continue;
+
+    insertStmt.run([p.item_id, hourBucket, p.buy_price, p.sell_price, p.buy_quantity||0, p.sell_quantity||0]);
     written++;
   }
 
@@ -224,7 +250,7 @@ function getPriceHistoryBatch(itemIds, days = 7) {
   const result = {};
   for (const row of rows) {
     if (!result[row.item_id]) result[row.item_id] = [];
-    result[row.item_id].push({ t: row.snapped_at, b: row.buy_price, s: row.sell_price });
+    result[row.item_id].push({ t: row.snapped_at, b: row.buy_price, s: row.sell_price, bq: row.buy_quantity||0, sq: row.sell_quantity||0 });
   }
   return result;
 }

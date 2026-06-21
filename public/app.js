@@ -210,8 +210,7 @@ function renderCraftResults(results, total) {
   const sorted = [...filtered].sort((a,b) => {
     if (state.sortKey === 'matCostToBuy') return a[state.sortKey] - b[state.sortKey];
     if (state.sortKey === 'spread') {
-      const sp = r => r.sellList > 0 ? (r.sellList - r.sellInstant) / r.sellList : 1;
-      return sp(a) - sp(b);
+      return (b.buyQuantity || 0) - (a.buyQuantity || 0);
     }
     return b[state.sortKey] - a[state.sortKey];
   });
@@ -279,33 +278,7 @@ async function fetchAndApplyTrends(results) {
     Object.assign(state.historyCache, history);
 
     results.forEach(r => {
-      const h          = history[r.outputItemId];
-      const snapCount  = h ? h.length : 0;
-      const spreadPct  = r.sellList > 0 ? Math.round((r.sellList - r.sellInstant) / r.sellList * 100) : null;
-
-      // Refine the liquidity tag now that we have activity data
-      const liqEl = document.querySelector(`[data-liq="${r.recipeId}"]`);
-      if (liqEl) {
-        if (snapCount === 0) {
-          // No price movement recorded at all — likely stale regardless of spread
-          if (liqEl.classList.contains('liq-liquid')) {
-            liqEl.classList.replace('liq-liquid', 'liq-slow');
-            liqEl.textContent = '● Slow';
-            const card = liqEl.closest('.recipe-card');
-            if (card) { card.classList.remove('liq-liquid'); card.classList.add('liq-slow'); }
-          }
-          liqEl.title = `Spread ${spreadPct ?? '?'}% · No price movement recorded yet`;
-        } else {
-          // Tight spread but barely any movement → downgrade to slow
-          if (liqEl.classList.contains('liq-liquid') && snapCount <= 2) {
-            liqEl.classList.replace('liq-liquid', 'liq-slow');
-            liqEl.textContent = '● Slow';
-            const card = liqEl.closest('.recipe-card');
-            if (card) { card.classList.remove('liq-liquid'); card.classList.add('liq-slow'); }
-          }
-          liqEl.title = `Spread ${spreadPct ?? '?'}% · ${snapCount} price changes in 7d`;
-        }
-      }
+      const h = history[r.outputItemId];
 
       // Trend badge (direction arrow)
       if (!h || h.length < 2) return;
@@ -341,18 +314,25 @@ function renderCraftCard(r) {
   const discs   = r.disciplines.slice(0,2).map(d=>`<span class="tag tag-disc">${d}</span>`).join('');
   const maxC    = r.isFullyCraftable ? calcMaxCraftable(r) : null;
 
-  // Liquidity: classify by buy/sell spread (synchronous — refined async after history loads)
-  const spreadFrac = r.sellList > 0 ? (r.sellList - r.sellInstant) / r.sellList : null;
-  const spreadPct  = spreadFrac !== null ? Math.round(spreadFrac * 100) : null;
-  const liqTier    = spreadPct === null ? null : spreadPct < 15 ? 'liquid' : spreadPct < 35 ? 'slow' : 'stale';
-  const liqLabels  = { liquid: '● Liquid', slow: '● Slow', stale: '● Stale' };
-  const liqTitles  = {
-    liquid: `Spread ${spreadPct}% — tight market, likely sells quickly`,
-    slow:   `Spread ${spreadPct}% — moderate activity`,
-    stale:  `Spread ${spreadPct}% — wide spread, may sit on TP`,
-  };
+  // Liquidity: classify by buy order depth (demand) and supply pressure
+  const buyQty  = r.buyQuantity  || 0;
+  const sellQty = r.sellQuantity || 0;
+  let liqTier, liqTitle;
+  if (buyQty === 0) {
+    liqTier  = null;
+  } else if (buyQty >= 500 && sellQty <= buyQty * 5) {
+    liqTier  = 'liquid';
+    liqTitle = `${buyQty.toLocaleString()} buy orders · ${sellQty.toLocaleString()} listings — active market`;
+  } else if (buyQty >= 50) {
+    liqTier  = 'slow';
+    liqTitle = `${buyQty.toLocaleString()} buy orders · ${sellQty.toLocaleString()} listings — moderate demand`;
+  } else {
+    liqTier  = 'stale';
+    liqTitle = `Only ${buyQty.toLocaleString()} buy orders · ${sellQty.toLocaleString()} listings — weak demand`;
+  }
+  const liqLabels = { liquid: '● Liquid', slow: '● Slow', stale: '● Stale' };
   const liqTag = liqTier
-    ? `<span class="tag liq-tag liq-${liqTier}" data-liq="${r.recipeId}" title="${liqTitles[liqTier]}">${liqLabels[liqTier]}</span>`
+    ? `<span class="tag liq-tag liq-${liqTier}" data-liq="${r.recipeId}" title="${liqTitle}">${liqLabels[liqTier]}</span>`
     : '';
 
   const ingRows = r.allIngredients.map(ing => {
@@ -582,28 +562,48 @@ function makeSpark(points, w = 120, h = 28) {
 }
 
 function renderMarketDetail(el, r, history) {
+  const buyQty     = r.buyQuantity  || 0;
+  const sellQty    = r.sellQuantity || 0;
   const spreadPct  = r.sellList > 0 ? Math.round((r.sellList - r.sellInstant) / r.sellList * 100) : null;
-  const snapCount  = history.length;
-  const hasData    = snapCount >= 2;
+  const hasData    = history.length >= 2;
   const sellPrices = history.map(p => p.s).filter(Boolean);
   const sellMin    = hasData ? Math.min(...sellPrices) : null;
   const sellMax    = hasData ? Math.max(...sellPrices) : null;
   const sellAvg    = hasData ? Math.round(sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length) : null;
+
+  // Quantity trend: latest vs earliest snapshot in history
+  const qtyPoints  = history.filter(p => p.bq > 0 || p.sq > 0);
+  const bqFirst    = qtyPoints.length ? qtyPoints[0].bq : null;
+  const bqLast     = qtyPoints.length ? qtyPoints[qtyPoints.length-1].bq : null;
+  const bqTrend    = (bqFirst && bqLast && bqFirst > 0)
+    ? ((bqLast - bqFirst) / bqFirst * 100).toFixed(0)
+    : null;
+
   const spark      = makeSpark(history);
   const spreadColor = spreadPct === null ? 'var(--text-muted)'
     : spreadPct < 15 ? 'var(--green)' : spreadPct < 35 ? 'var(--orange)' : 'var(--red)';
+  const bqColor = buyQty >= 500 ? 'var(--green)' : buyQty >= 50 ? 'var(--orange)' : 'var(--red)';
+  const sqColor = sellQty > buyQty * 5 ? 'var(--red)' : sellQty > buyQty ? 'var(--orange)' : 'var(--green)';
 
   el.innerHTML = `<div class="market-section">
     <h4>Market Activity (7d)</h4>
     ${spark ? `<div class="market-spark">${spark}</div>` : ''}
     <div class="market-stats">
       <div class="mstat">
+        <span class="mstat-label">Buy orders (demand)</span>
+        <span class="mstat-value" style="color:${bqColor}">${buyQty.toLocaleString()}${bqTrend !== null ? ` <small style="opacity:.7">${bqTrend > 0 ? '+' : ''}${bqTrend}% 7d</small>` : ''}</span>
+      </div>
+      <div class="mstat">
+        <span class="mstat-label">Sell listings (supply)</span>
+        <span class="mstat-value" style="color:${sqColor}">${sellQty.toLocaleString()}</span>
+      </div>
+      <div class="mstat">
         <span class="mstat-label">Buy/sell spread</span>
         <span class="mstat-value" style="color:${spreadColor}">${spreadPct ?? '?'}%</span>
       </div>
       <div class="mstat">
-        <span class="mstat-label">Price changes (7d)</span>
-        <span class="mstat-value">${snapCount > 0 ? snapCount : '—'}</span>
+        <span class="mstat-label">Snapshots (7d)</span>
+        <span class="mstat-value">${history.length > 0 ? history.length : '—'}</span>
       </div>
       ${hasData
         ? `<div class="mstat">

@@ -101,6 +101,8 @@ async function calcProfitableRecipes(materialStorage, unlockedRecipeIds, opts = 
       sellInstantAfterFees: sellValue,
       sellList: outputPrice.sell_price * recipe.output_count,
       sellListAfterFees: listValue,
+      buyQuantity:  outputPrice.buy_quantity  || 0,
+      sellQuantity: outputPrice.sell_quantity || 0,
       matCostFromStorage, matCostToBuy, totalCost,
       profitVsRaw, profitAbsolute,
       profitMargin: totalCost > 0 ? ((sellValue - totalCost) / totalCost * 100).toFixed(1) : 'inf',
@@ -131,9 +133,11 @@ async function refreshPrices(itemIds) {
   try {
     const prices = await fetchPrices(toRefresh);
     const rows   = prices.map(p => ({
-      item_id:    p.id,
-      buy_price:  (p.buys  && p.buys.unit_price)  || 0,
-      sell_price: (p.sells && p.sells.unit_price) || 0,
+      item_id:      p.id,
+      buy_price:    (p.buys  && p.buys.unit_price)  || 0,
+      sell_price:   (p.sells && p.sells.unit_price) || 0,
+      buy_quantity: (p.buys  && p.buys.quantity)    || 0,
+      sell_quantity:(p.sells && p.sells.quantity)   || 0,
     }));
 
     db.upsertPrices(rows);

@@ -375,9 +375,11 @@ async function runHourlySnapshot() {
     const { fetchPrices } = require('./gw2api');
     const prices = await fetchPrices(ids);
     const rows   = prices.map(p => ({
-      item_id:    p.id,
-      buy_price:  (p.buys  && p.buys.unit_price)  || 0,
-      sell_price: (p.sells && p.sells.unit_price) || 0,
+      item_id:      p.id,
+      buy_price:    (p.buys  && p.buys.unit_price)  || 0,
+      sell_price:   (p.sells && p.sells.unit_price) || 0,
+      buy_quantity: (p.buys  && p.buys.quantity)    || 0,
+      sell_quantity:(p.sells && p.sells.quantity)   || 0,
     }));
 
     db.upsertPrices(rows);
