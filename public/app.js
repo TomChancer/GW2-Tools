@@ -112,7 +112,7 @@ function renderAppUpdateStatus(data) {
 
   switch (data.status) {
     case 'checking':
-      dot.className = 'status-dot warn';
+      dot.className = 'status-dot spinning';
       txt.textContent = 'Checking for updates…';
       break;
     case 'up-to-date':
@@ -126,7 +126,7 @@ function renderAppUpdateStatus(data) {
       row.onclick = triggerUpdateDownload;
       break;
     case 'downloading':
-      dot.className = 'status-dot warn';
+      dot.className = 'status-dot spinning';
       txt.textContent = `Application: Downloading update… ${data.progress}%`;
       break;
     case 'downloaded':
@@ -145,13 +145,28 @@ function renderAppUpdateStatus(data) {
   }
 }
 
+// Both triggers paint an immediate spinner before the request even resolves —
+// otherwise there's a perceptible dead moment between the click and the next poll.
+function setUpdateRowSpinning(text) {
+  const dot = document.getElementById('appUpdateDot');
+  const txt = document.getElementById('appUpdateText');
+  const row = document.getElementById('appUpdateRow');
+  if (!dot || !txt || !row) return;
+  dot.className = 'status-dot spinning';
+  txt.textContent = text;
+  row.classList.remove('clickable');
+  row.onclick = null;
+}
+
 async function triggerUpdateDownload() {
+  setUpdateRowSpinning('Application: Starting download…');
   try { await apiFetch('/api/app-update/download', {}); } catch(e) { /* surfaced via next poll */ }
   clearTimeout(appUpdatePollTimer);
   appUpdatePollTimer = setTimeout(pollAppUpdateStatus, 500);
 }
 
 async function triggerUpdateInstall() {
+  setUpdateRowSpinning('Application: Restarting to install…');
   try { await apiFetch('/api/app-update/install', {}); } catch(e) { /* app is about to quit anyway */ }
 }
 

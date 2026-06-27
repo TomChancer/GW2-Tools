@@ -103,6 +103,7 @@
   .status-dot.ok   { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .status-dot.warn { background: var(--gold); }
   .status-dot.err  { background: var(--red); }
+  .status-dot.spinning { background: transparent; box-shadow: none; width: 9px; height: 9px; border: 1.5px solid var(--border); border-top-color: var(--gold); animation: spin 0.7s linear infinite; }
 
   /* ── Main layout ── */
   .main { display: grid; grid-template-columns: 280px 1fr; overflow: hidden; }
