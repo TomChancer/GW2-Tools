@@ -3,3 +3,4 @@ gw2.db
 *.db-shm
 *.db-wal
 dist/
+CLAUDE.md
