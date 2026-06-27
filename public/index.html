@@ -132,6 +132,18 @@
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
   .btn-ghost:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  .icon-btn { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius-sm); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; flex-shrink: 0; transition: all 0.15s; }
+  .icon-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: none; align-items: center; justify-content: center; z-index: 1000; }
+  .modal-overlay.active { display: flex; }
+  .modal-panel { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); width: 420px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border-light); }
+  .modal-header h3 { font-size: 14px; font-weight: 600; color: var(--gold); margin: 0; }
+  .modal-close { background: transparent; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; line-height: 1; padding: 4px; }
+  .modal-close:hover { color: var(--text-primary); }
+  .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
   .btn-full { width: 100%; }
   .btn-run { font-size: 14px; padding: 9px 16px; font-weight: 600; }
 
@@ -404,6 +416,7 @@
       <div class="status-dot" id="appUpdateDot"></div>
       <span id="appUpdateText">—</span>
     </div>
+    <button class="icon-btn" id="settingsBtn" title="Settings" style="margin-left:16px;">⚙</button>
   </div>
 
   <!-- Tab nav -->
@@ -430,19 +443,6 @@
 
     <!-- Sidebar -->
     <aside class="sidebar">
-
-      <!-- Shared: API key -->
-      <div class="sidebar-section">
-        <h3>API Key</h3>
-        <div class="key-row">
-          <input type="password" id="apiKeyInput" placeholder="Paste your GW2 API key…" autocomplete="off"/>
-          <button class="btn btn-ghost" id="validateBtn">Test</button>
-        </div>
-        <div class="key-status" id="keyStatus"></div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
-          Needs: <strong>inventories</strong>, <strong>unlocks</strong>
-        </div>
-      </div>
 
       <!-- Crafts sidebar panel -->
       <div class="sidebar-panel active" id="panel-crafts">
@@ -755,6 +755,34 @@
     </main>
   </div>
 </div>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <h3>Settings</h3>
+      <button class="modal-close" id="settingsCloseBtn">✕</button>
+    </div>
+    <div class="modal-body">
+      <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold);padding-bottom:6px;border-bottom:1px solid var(--border-light);">API Key</h3>
+      <div class="key-row">
+        <input type="password" id="apiKeyInput" placeholder="Paste your GW2 API key…" autocomplete="off"/>
+        <button class="btn btn-ghost" id="validateBtn">Test</button>
+      </div>
+      <div class="key-status" id="keyStatus"></div>
+      <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-top:4px;">
+        Saved on this device and used by every tab. Recommended permissions:
+        <table style="width:100%;margin-top:6px;border-collapse:collapse;">
+          <tr><td style="color:var(--text-secondary);padding:2px 0;"><strong>inventories</strong></td><td style="text-align:right;">Crafting, Salvage</td></tr>
+          <tr><td style="color:var(--text-secondary);padding:2px 0;"><strong>unlocks</strong></td><td style="text-align:right;">Crafting</td></tr>
+          <tr><td style="color:var(--text-secondary);padding:2px 0;"><strong>characters</strong></td><td style="text-align:right;">Salvage</td></tr>
+          <tr><td style="color:var(--text-secondary);padding:2px 0;"><strong>achievements</strong></td><td style="text-align:right;">Collections</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>

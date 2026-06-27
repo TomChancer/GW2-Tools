@@ -50,9 +50,19 @@ document.addEventListener('DOMContentLoaded', () => {
   bindEvents();
   checkDbStatus();
   pollAppUpdateStatus();
-  const saved = sessionStorage.getItem('gw2_api_key');
+  // localStorage (not sessionStorage) so the key survives fully closing and reopening the app
+  const saved = localStorage.getItem('gw2_api_key');
   if (saved) { document.getElementById('apiKeyInput').value = saved; state.apiKey = saved; }
 });
+
+// ── Settings modal ───────────────────────────────────────────────────────────
+function openSettings() {
+  document.getElementById('apiKeyInput').value = state.apiKey;
+  document.getElementById('settingsModal').classList.add('active');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('active');
+}
 
 // ── DB status ────────────────────────────────────────────────────────────────
 async function checkDbStatus() {
@@ -152,14 +162,24 @@ function bindEvents() {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
   });
 
-  // API key
+  // API key (lives in the settings modal, used by every tab via state.apiKey)
   const keyInput = document.getElementById('apiKeyInput');
   keyInput.addEventListener('input', () => {
     state.apiKey = keyInput.value.trim();
-    sessionStorage.setItem('gw2_api_key', state.apiKey);
+    localStorage.setItem('gw2_api_key', state.apiKey);
     document.getElementById('keyStatus').className = 'key-status';
   });
   document.getElementById('validateBtn').addEventListener('click', validateKey);
+
+  // Settings modal
+  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+  document.getElementById('settingsCloseBtn').addEventListener('click', closeSettings);
+  document.getElementById('settingsModal').addEventListener('click', (e) => {
+    if (e.target.id === 'settingsModal') closeSettings();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSettings();
+  });
 
   // Craft controls
   document.getElementById('partialToggle').addEventListener('click', () => {
