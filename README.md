@@ -41,15 +41,6 @@ Or run it as a plain browser app instead of the Electron shell:
 npm start            # then open http://localhost:3000
 ```
 
-### Building an installer
-
-```bash
-npm run dist         # builds dist/GW2 Tools Setup x.x.x.exe locally, no publish
-npm run release       # builds AND uploads to GitHub Releases (needs $env:GH_TOKEN with repo write access)
-```
-
-If you change the app icon, regenerate it first: `node scripts/make-icon.js` (reads `build/icon-source.png`, writes `build/icon.ico`).
-
 ## Project structure
 
 ```
@@ -62,7 +53,6 @@ GW2Tools/
 ├── profit.js          # Crafting profit calculations
 ├── salvage-kits.js    # Salvage kit EV calculations
 ├── seed.js            # One-time DB population script
-├── scripts/make-icon.js
 ├── build/icon.ico     # App icon (Windows)
 ├── public/            # Frontend — plain HTML/CSS/JS, no build step
 └── gw2.db             # SQLite database (gitignored — created by seed.js, lives in %APPDATA% once packaged)
