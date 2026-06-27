@@ -1,24 +1,13 @@
 // Electron main process — boots the existing Express server in-process (no
 // separate node install needed by the end user) and opens it in a normal window.
+// Auto-update logic itself lives in routes/app-update.js, exposed over HTTP so
+// the plain web frontend can show status and trigger download/install explicitly.
 const { app, BrowserWindow, Menu } = require('electron');
-const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 const ICON_PATH = path.join(__dirname, '..', 'build', 'icon.ico');
 
 let mainWindow = null;
-
-// electron-updater needs the packaged app's update metadata (app-update.yml),
-// which only exists in a built installer — running via `npm run electron` would just error.
-function setupAutoUpdater() {
-  if (!app.isPackaged) return;
-  autoUpdater.logger = console;
-  autoUpdater.on('error', (err) => console.error('[AutoUpdater]', err.message));
-
-  const check = () => autoUpdater.checkForUpdatesAndNotify().catch(e => console.error('[AutoUpdater]', e.message));
-  check();
-  setInterval(check, 4 * 60 * 60 * 1000); // re-check every 4h in case the app stays open
-}
 
 async function createWindow() {
   const { start } = require('../server');
@@ -41,8 +30,6 @@ async function createWindow() {
   mainWindow.loadURL(`http://localhost:${port}`);
 
   mainWindow.on('closed', () => { mainWindow = null; });
-
-  setupAutoUpdater();
 }
 
 // Single instance lock — relaunching the .exe focuses the existing window instead of opening a second copy

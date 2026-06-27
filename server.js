@@ -27,6 +27,7 @@ app.post('/api/validate-key', async (req, res) => {
 // ── Feature routers ────────────────────────────────────────────────────────────
 const flip        = require('./routes/flip');
 const collections = require('./routes/collections');
+const appUpdate    = require('./routes/app-update');
 
 app.use('/api', require('./routes/craft'));
 app.use('/api', require('./routes/salvage'));
@@ -34,6 +35,7 @@ app.use('/api/history', require('./routes/history'));
 app.use('/api/forge', require('./routes/forge'));
 app.use('/api/flip', flip.router);
 app.use('/api/collections', collections.router);
+app.use('/api/app-update', appUpdate.router);
 
 // ── Hourly price history scheduler ───────────────────────────────────────────
 // Runs at the top of every hour to snapshot prices for all recipe-relevant items
@@ -109,6 +111,7 @@ async function start() {
   scheduleHourlySnapshots();
   flip.start();
   collections.start();
+  appUpdate.start();
 
   return PORT;
 }

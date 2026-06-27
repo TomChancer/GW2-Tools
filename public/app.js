@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   buildDiscGrid();
   bindEvents();
   checkDbStatus();
+  pollAppUpdateStatus();
   const saved = sessionStorage.getItem('gw2_api_key');
   if (saved) { document.getElementById('apiKeyInput').value = saved; state.apiKey = saved; }
 });
@@ -70,6 +71,78 @@ async function checkDbStatus() {
     dot.className = 'status-dot err';
     txt.textContent = 'Server offline';
   }
+}
+
+// ── App update status ────────────────────────────────────────────────────────
+// Polls /api/app-update forever: fast while something's actively happening
+// (checking/downloading), slow otherwise. Row stays hidden entirely when not
+// running inside the packaged Electron app (status: 'unsupported').
+let appUpdatePollTimer = null;
+
+async function pollAppUpdateStatus() {
+  try {
+    const data = await apiFetch('/api/app-update');
+    renderAppUpdateStatus(data);
+    clearTimeout(appUpdatePollTimer);
+    const fast = data.status === 'checking' || data.status === 'downloading';
+    appUpdatePollTimer = setTimeout(pollAppUpdateStatus, fast ? 1500 : 30000);
+  } catch { /* server offline — silent, dbStatus already reports this */ }
+}
+
+function renderAppUpdateStatus(data) {
+  const row = document.getElementById('appUpdateRow');
+  const dot = document.getElementById('appUpdateDot');
+  const txt = document.getElementById('appUpdateText');
+  if (!row) return;
+
+  if (data.status === 'unsupported') { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  row.classList.remove('clickable');
+  row.onclick = null;
+
+  switch (data.status) {
+    case 'checking':
+      dot.className = 'status-dot warn';
+      txt.textContent = 'Checking for updates…';
+      break;
+    case 'up-to-date':
+      dot.className = 'status-dot ok';
+      txt.textContent = 'Application: Up to date';
+      break;
+    case 'available':
+      dot.className = 'status-dot warn';
+      txt.textContent = `Application: Update available (v${data.version}) — click to download`;
+      row.classList.add('clickable');
+      row.onclick = triggerUpdateDownload;
+      break;
+    case 'downloading':
+      dot.className = 'status-dot warn';
+      txt.textContent = `Application: Downloading update… ${data.progress}%`;
+      break;
+    case 'downloaded':
+      dot.className = 'status-dot ok';
+      txt.textContent = `Application: Update ready (v${data.version}) — click to restart & install`;
+      row.classList.add('clickable');
+      row.onclick = triggerUpdateInstall;
+      break;
+    case 'error':
+      dot.className = 'status-dot err';
+      txt.textContent = 'Application: Update check failed';
+      break;
+    default:
+      dot.className = 'status-dot';
+      txt.textContent = 'Application: —';
+  }
+}
+
+async function triggerUpdateDownload() {
+  try { await apiFetch('/api/app-update/download', {}); } catch(e) { /* surfaced via next poll */ }
+  clearTimeout(appUpdatePollTimer);
+  appUpdatePollTimer = setTimeout(pollAppUpdateStatus, 500);
+}
+
+async function triggerUpdateInstall() {
+  try { await apiFetch('/api/app-update/install', {}); } catch(e) { /* app is about to quit anyway */ }
 }
 
 // ── Tab switching ────────────────────────────────────────────────────────────
