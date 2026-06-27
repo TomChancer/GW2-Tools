@@ -46,11 +46,14 @@ async function getAccountRecipes(apiKey)   { return gw2Fetch(`${BASE}/v2/account
 async function validateApiKey(apiKey)      { return gw2Fetch(`${BASE}/v2/tokeninfo`, apiKey); }
 async function getAllRecipeIds()            { return gw2Fetch(`${BASE}/v2/recipes`); }
 async function getAllItemIds()              { return gw2Fetch(`${BASE}/v2/items`); }
-async function fetchRecipes(ids, onProgress) { return fetchInBatches('/v2/recipes', ids, null, onProgress); }
-async function fetchItems(ids, onProgress)   { return fetchInBatches('/v2/items', ids, null, onProgress); }
-async function fetchPrices(ids)              { return fetchInBatches('/v2/commerce/prices', ids); }
+async function fetchRecipes(ids, onProgress)       { return fetchInBatches('/v2/recipes', ids, null, onProgress); }
+async function fetchItems(ids, onProgress)         { return fetchInBatches('/v2/items', ids, null, onProgress); }
+async function fetchPrices(ids, onProgress)        { return fetchInBatches('/v2/commerce/prices', ids, null, onProgress); }
+async function fetchAchievements(ids, onProgress)  { return fetchInBatches('/v2/achievements', ids, null, onProgress); }
+async function getAllAchievementIds()               { return gw2Fetch(`${BASE}/v2/achievements`); }
+async function getAchievementCategories()          { return gw2Fetch(`${BASE}/v2/achievements/categories?ids=all`); }
 
 function chunk(arr, size) { const c=[]; for(let i=0;i<arr.length;i+=size) c.push(arr.slice(i,i+size)); return c; }
 function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
-module.exports = { apiFetch, getAccountMaterials, getAccountRecipes, validateApiKey, getAllRecipeIds, getAllItemIds, fetchRecipes, fetchItems, fetchPrices };
+module.exports = { apiFetch, getAccountMaterials, getAccountRecipes, validateApiKey, getAllRecipeIds, getAllItemIds, fetchRecipes, fetchItems, fetchPrices, fetchAchievements, getAllAchievementIds, getAchievementCategories };

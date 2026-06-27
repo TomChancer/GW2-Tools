@@ -1,15 +1,60 @@
 {
   "name": "gw2-craft-profit",
   "version": "1.0.0",
-  "description": "GW2 crafting profit calculator using material storage",
-  "main": "server.js",
+  "description": "GW2 crafting, salvage, flipping, mystic forge, and collection tools",
+  "author": "Thomas Chance",
+  "license": "MIT",
+  "repository": "https://github.com/TomChancer/GW2-Tools",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "electron": "electron .",
+    "dist": "electron-builder",
+    "release": "electron-builder --publish always"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "express": "^4.18.2",
     "node-fetch": "^2.7.0",
     "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.35.2"
+  },
+  "build": {
+    "appId": "com.ringo.gw2tools",
+    "productName": "GW2 Tools",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "server.js",
+      "db.js",
+      "gw2api.js",
+      "profit.js",
+      "salvage-kits.js",
+      "gw2.db",
+      "routes/**/*",
+      "public/**/*",
+      "electron/**/*",
+      "build/icon.ico"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "TomChancer",
+      "repo": "GW2-Tools"
+    }
   }
 }

@@ -231,6 +231,7 @@
   .mstat-label { color: var(--text-secondary); }
   .mstat-value { font-family: var(--font-data); font-size: 11px; }
 
+  .detail-section { min-width: 0; }
   .detail-section h4 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gold); margin-bottom: 8px; }
 
   .ingredient-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border-light); font-size: 12px; }
@@ -302,6 +303,78 @@
   .kit-cost { font-family: var(--font-data); font-size: 11px; color: var(--text-muted); }
   .kit-note { font-size: 10px; color: var(--text-muted); grid-column: 2; }
 
+  /* ── Flip cards ── */
+  .flip-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .flip-card { background: var(--bg-panel); border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden; transition: border-color 0.15s; }
+  .flip-card:hover { border-color: var(--border); }
+  .flip-card.expanded { border-color: var(--gold-dim); }
+  .flip-card.quick-win   { border-left: 3px solid var(--blue); }
+  .flip-card.normal-flip { border-left: 3px solid var(--gold); }
+  .flip-card.watching { box-shadow: 0 0 0 1px var(--gold-dim); }
+
+  .flip-header { display: grid; grid-template-columns: 40px 1fr auto auto auto auto; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; }
+
+  .drop-badge { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; white-space: nowrap; background: rgba(248,81,73,0.15); color: var(--red); }
+  .roi-badge  { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; white-space: nowrap; background: rgba(63,185,80,0.12); color: var(--green); }
+
+  .flip-detail { display: none; border-top: 1px solid var(--border-light); padding: 12px; }
+  .flip-card.expanded .flip-detail { display: block; }
+  .flip-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* ── Sync status banner ── */
+  .sync-banner { padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11px; display: flex; align-items: center; gap: 8px; }
+  .sync-banner.running { background: rgba(88,166,255,0.1); color: var(--blue); }
+  .sync-banner.done    { background: rgba(63,185,80,0.08); color: var(--green); }
+  .sync-banner.never   { background: rgba(200,164,90,0.08); color: var(--gold); }
+  .sync-banner.error   { background: var(--red-dim); color: var(--red); }
+
+  /* ── Watch button ── */
+  .watch-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all 0.15s; font-family: var(--font-ui); }
+  .watch-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
+  .watch-btn.watching { border-color: var(--gold-dim); background: var(--gold-glow); color: var(--gold); }
+
+  /* ── Forge cards ── */
+  .forge-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .forge-card { background: var(--bg-panel); border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden; transition: border-color 0.15s; }
+  .forge-card:hover { border-color: var(--border); }
+  .forge-card.expanded { border-color: var(--gold-dim); }
+  .forge-card.rare-roll   { border-left: 3px solid var(--rarity-rare); }
+  .forge-card.exotic-roll { border-left: 3px solid var(--rarity-exotic); }
+
+  .forge-header { display: grid; grid-template-columns: 40px 1fr auto auto auto auto; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; }
+
+  .forge-detail { display: none; border-top: 1px solid var(--border-light); padding: 12px; }
+  .forge-card.expanded .forge-detail { display: block; }
+  .forge-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .forge-items { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .forge-item-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; border-bottom: 1px solid var(--border-light); }
+  .forge-item-row:last-child { border-bottom: none; }
+
+  .delta-positive { color: var(--green); }
+  .delta-negative { color: var(--red); }
+
+  /* ── Collections ── */
+  .coll-card { background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: var(--radius); margin-bottom: 2px; overflow: hidden; }
+  .coll-header { display: grid; grid-template-columns: 40px 1fr auto auto; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; user-select: none; }
+  .coll-header:hover { background: var(--bg-elevated); }
+  .coll-detail { display: none; border-top: 1px solid var(--border-light); padding: 12px; }
+  .coll-card.expanded .coll-detail { display: block; }
+  .coll-card.expanded .expand-icon { transform: rotate(180deg); }
+  .bit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 5px; margin-top: 8px; }
+  .bit-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bg-elevated); border-radius: var(--radius-sm); font-size: 12px; border: 1px solid transparent; }
+  .bit-item.has-tp { border-color: rgba(200,164,90,0.25); }
+  .bit-icon { width: 28px; height: 28px; border-radius: 3px; object-fit: cover; flex-shrink: 0; background: var(--bg-input); }
+  .bit-info { flex: 1; min-width: 0; }
+  .bit-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .bit-source { font-size: 10px; color: var(--text-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bit-price { font-family: var(--font-data); font-size: 11px; white-space: nowrap; text-align: right; flex-shrink: 0; color: var(--text-secondary); }
+  .bit-wiki { color: var(--text-muted); text-decoration: none; font-size: 13px; flex-shrink: 0; line-height: 1; padding: 2px; }
+  .bit-wiki:hover { color: var(--text-primary); }
+  .bit-item.bit-done { background: var(--bg-input); border-color: transparent; }
+
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -334,13 +407,14 @@
     <div class="tab" data-tab="salvage">
       <span class="tab-icon">🔨</span> Salvage Advisor
     </div>
-    <div class="tab-soon">
+    <div class="tab" data-tab="flipping">
       <span class="tab-icon">📈</span> Flipping
-      <span class="badge">Soon</span>
     </div>
-    <div class="tab-soon">
+    <div class="tab" data-tab="forge">
       <span class="tab-icon">⚗️</span> Mystic Forge
-      <span class="badge">Soon</span>
+    </div>
+    <div class="tab" data-tab="collections">
+      <span class="tab-icon">📖</span> Collections
     </div>
   </div>
 
@@ -487,6 +561,133 @@
         <button class="btn btn-primary btn-full btn-run" id="salvageBtn">🔨 Analyze Salvage</button>
       </div>
 
+      <!-- Flipping sidebar panel -->
+      <div class="sidebar-panel" id="panel-flipping">
+
+        <div id="syncStatusBanner"></div>
+
+        <div class="sidebar-section">
+          <h3>Quick Wins</h3>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Listings priced below their recent average — buy cheap, relist at normal price</div>
+          <div class="filter-row">
+            <div>
+              <label>Min profit (silver)</label>
+              <input type="number" id="qwMinProfit" value="10" step="1" min="1"/>
+            </div>
+            <div>
+              <label>Below avg by (%)</label>
+              <input type="number" id="qwDropPct" value="20" step="5" min="5" max="80"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Normal Flips</h3>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Place buy orders, relist at sell price — profit from the spread</div>
+          <div>
+            <label>Category</label>
+            <select id="nfCategory">
+              <option value="">All categories</option>
+            </select>
+          </div>
+          <div style="margin-top:6px;">
+            <label>Subcategory</label>
+            <select id="nfSubcategory">
+              <option value="">All subcategories</option>
+            </select>
+          </div>
+          <div class="filter-row" style="margin-top:6px;">
+            <div>
+              <label>Min profit (silver)</label>
+              <input type="number" id="nfMinProfit" value="10" step="1" min="1"/>
+            </div>
+            <div>
+              <label>Min ROI %</label>
+              <input type="number" id="nfMinROI" value="15" step="5" min="1"/>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div>
+              <label>Min buy orders</label>
+              <input type="number" id="nfMinBuyQty" value="50" step="10" min="1"/>
+            </div>
+            <div>
+              <label>Max spend (gold)</label>
+              <input type="number" id="nfMaxBuy" value="0" step="1" min="0" title="0 = no limit"/>
+            </div>
+          </div>
+          <div>
+            <label>Max sell/buy ratio <span style="color:var(--text-muted);font-size:10px;">(2.0 = sell ≤ 2× buy — removes thin markets)</span></label>
+            <input type="number" id="nfMaxSpread" value="2.0" step="0.5" min="1.1" max="10"/>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-full btn-run" id="flipBtn">📈 Find Flip Opportunities</button>
+
+      </div>
+
+      <!-- Forge sidebar panel -->
+      <div class="sidebar-panel" id="panel-forge">
+
+        <div class="sidebar-section">
+          <h3>How it works</h3>
+          <div style="font-size:11px;color:var(--text-secondary);line-height:1.7;">
+            Combine <strong>4 weapons of the same type</strong> in the Mystic Forge to receive a <strong>random exotic</strong> of that type.<br><br>
+            Rare → Exotic rolls are the cheapest way to hunt precursors. Exotic → Exotic rerolls produce a higher base value output and can yield rare skins.
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Notable targets</h3>
+          <div style="font-size:11px;color:var(--text-secondary);line-height:1.8;">
+            <div style="color:var(--rarity-exotic);font-weight:600;margin-bottom:4px;">Rare skins (exotic rerolls)</div>
+            <div>⚔ Scythe — Staff exotics</div>
+            <div>🛡 Grinning Ghastly Shield — Shield exotics</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Halloween event items — high value when available</div>
+            <div style="color:var(--rarity-rare);font-weight:600;margin-top:10px;margin-bottom:4px;">Precursors (rare rolls)</div>
+            <div style="font-size:10px;color:var(--text-muted);">Any weapon type can yield a precursor exotic. Drop rates are not published by ANet — each roll is independent.</div>
+          </div>
+        </div>
+
+        <button class="btn btn-ghost btn-full" id="forgeRefreshBtn" style="margin-top:auto;">↺ Refresh prices</button>
+
+      </div>
+
+      <!-- Collections sidebar -->
+      <div class="sidebar-panel" id="panel-collections">
+
+        <div class="sidebar-section">
+          <h3>Search</h3>
+          <input type="search" id="collSearch" placeholder="Filter by name…" autocomplete="off"/>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Category</h3>
+          <select id="collCategory">
+            <option value="">All categories</option>
+          </select>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Smart suggestions</h3>
+          <button class="btn btn-ghost btn-full" id="collCheapestBtn">💰 Cheapest to finish</button>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6;">
+            Requires API key with the <strong>achievements</strong> permission. Ranks your incomplete collections by remaining TP cost, cheapest first.
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Sync</h3>
+          <div class="sync-banner never" id="collSyncBanner">Not yet synced</div>
+          <button class="btn btn-ghost btn-full" id="collSyncBtn" style="margin-top:8px;">↺ Sync achievements</button>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6;">
+            Fetches all GW2 achievement data (~9 000 achievements). One-time download, then weekly refresh.
+            Takes ~1 min on first run.
+          </div>
+        </div>
+
+      </div>
+
     </aside>
 
     <!-- Content -->
@@ -509,6 +710,38 @@
             <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
           </svg>
           <p>Click <strong>Analyze Salvage</strong> to see every equippable item in your inventory with a recommendation: sell, salvage, or extract the upgrade.</p>
+        </div>
+      </div>
+
+      <!-- Flipping panel -->
+      <div class="tab-panel" id="tabpanel-flipping">
+        <div class="empty-state">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+          </svg>
+          <p>Set your filters and click <strong>Find Flip Opportunities</strong> to scan for profitable trades.</p>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Quick Wins need price history (builds over time).<br/>Normal Flips work immediately from live prices.</p>
+        </div>
+      </div>
+
+      <!-- Collections panel -->
+      <div class="tab-panel" id="tabpanel-collections">
+        <div class="empty-state">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+          <p>Search for a collection by name or pick a category from the sidebar.</p>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Sync achievements first if this is your first visit.</p>
+        </div>
+      </div>
+
+      <!-- Forge panel -->
+      <div class="tab-panel" id="tabpanel-forge">
+        <div class="empty-state">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4">
+            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>
+          </svg>
+          <p>Loading Mystic Forge data…</p>
         </div>
       </div>
 

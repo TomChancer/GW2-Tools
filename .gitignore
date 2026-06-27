@@ -2,3 +2,4 @@ node_modules/
 gw2.db
 *.db-shm
 *.db-wal
+dist/
