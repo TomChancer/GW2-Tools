@@ -1,0 +1,36 @@
+/* Shared dark theme — used by index.html (main app) and overlay.html (wiki overlay) */
+:root {
+  --bg-deep:      #0d1117;
+  --bg-panel:     #161b22;
+  --bg-elevated:  #1c2330;
+  --bg-input:     #0d1117;
+  --border:       #30363d;
+  --border-light: #21262d;
+  --text-primary:   #e6d9c3;
+  --text-secondary: #8b949e;
+  --text-muted:     #484f58;
+  --gold:         #c8a45a;
+  --gold-dim:     #7a6138;
+  --gold-glow:    rgba(200, 164, 90, 0.15);
+  --green:        #3fb950;
+  --green-dim:    #1a4023;
+  --red:          #f85149;
+  --red-dim:      #4a1a18;
+  --blue:         #58a6ff;
+  --orange:       #e3a84a;
+  --purple:       #9b38f7;
+  --rarity-basic:      #aaaaaa;
+  --rarity-fine:       #4e9fdf;
+  --rarity-masterwork: #67a833;
+  --rarity-rare:       #fcd00b;
+  --rarity-exotic:     #ffa405;
+  --rarity-ascended:   #fb3e8d;
+  --rarity-legendary:  #9b38f7;
+  --font-ui:   'Segoe UI', system-ui, sans-serif;
+  --font-data: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  --radius: 6px;
+  --radius-sm: 3px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg-deep); color: var(--text-primary); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }

@@ -4,42 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GW2 Tools</title>
+<link rel="stylesheet" href="theme.css">
 <style>
-  :root {
-    --bg-deep:      #0d1117;
-    --bg-panel:     #161b22;
-    --bg-elevated:  #1c2330;
-    --bg-input:     #0d1117;
-    --border:       #30363d;
-    --border-light: #21262d;
-    --text-primary:   #e6d9c3;
-    --text-secondary: #8b949e;
-    --text-muted:     #484f58;
-    --gold:         #c8a45a;
-    --gold-dim:     #7a6138;
-    --gold-glow:    rgba(200, 164, 90, 0.15);
-    --green:        #3fb950;
-    --green-dim:    #1a4023;
-    --red:          #f85149;
-    --red-dim:      #4a1a18;
-    --blue:         #58a6ff;
-    --orange:       #e3a84a;
-    --purple:       #9b38f7;
-    --rarity-basic:      #aaaaaa;
-    --rarity-fine:       #4e9fdf;
-    --rarity-masterwork: #67a833;
-    --rarity-rare:       #fcd00b;
-    --rarity-exotic:     #ffa405;
-    --rarity-ascended:   #fb3e8d;
-    --rarity-legendary:  #9b38f7;
-    --font-ui:   'Segoe UI', system-ui, sans-serif;
-    --font-data: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-    --radius: 6px;
-    --radius-sm: 3px;
-  }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; background: var(--bg-deep); color: var(--text-primary); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; overflow: hidden; }
+  html, body { overflow: hidden; }
 
   /* ── App shell ── */
   .app { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; }
@@ -279,6 +246,7 @@
   .salvage-card.action-sell   { border-left: 3px solid var(--green); }
   .salvage-card.action-salvage { border-left: 3px solid var(--orange); }
   .salvage-card.action-extract { border-left: 3px solid var(--purple); }
+  .salvage-card.action-vendor { border-left: 3px solid var(--text-muted); }
 
   .salvage-header { display: grid; grid-template-columns: 40px 1fr auto auto auto auto; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; }
 
@@ -286,6 +254,7 @@
   .action-badge.sell    { background: rgba(63,185,80,0.15);  color: var(--green); }
   .action-badge.salvage { background: rgba(227,168,74,0.15); color: var(--orange); }
   .action-badge.extract { background: rgba(155,56,247,0.15); color: var(--purple); }
+  .action-badge.vendor  { background: rgba(139,148,158,0.15); color: var(--text-muted); }
 
   .salvage-detail { display: none; border-top: 1px solid var(--border-light); padding: 12px; }
   .salvage-card.expanded .salvage-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }

@@ -36,6 +36,7 @@ app.use('/api/forge', require('./routes/forge'));
 app.use('/api/flip', flip.router);
 app.use('/api/collections', collections.router);
 app.use('/api/app-update', appUpdate.router);
+app.use('/api/wiki', require('./routes/wiki'));
 
 // ── Hourly price history scheduler ───────────────────────────────────────────
 // Runs at the top of every hour to snapshot prices for all recipe-relevant items

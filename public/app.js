@@ -591,6 +591,7 @@ function renderSalvageResults(items, ectoPrice) {
   const sells   = filtered.filter(i => i.action === 'sell');
   const salvage = filtered.filter(i => i.action === 'salvage');
   const extract = filtered.filter(i => i.action === 'extract');
+  const vendor  = filtered.filter(i => i.action === 'vendor');
 
   const totalGold = filtered.reduce((s,i) => s + (i.recommendedValue||0), 0);
 
@@ -600,7 +601,8 @@ function renderSalvageResults(items, ectoPrice) {
       ${filtered.length} items &nbsp;·&nbsp;
       <span style="color:var(--green)">${sells.length} sell</span> &nbsp;·&nbsp;
       <span style="color:var(--orange)">${salvage.length} salvage</span> &nbsp;·&nbsp;
-      <span style="color:var(--purple)">${extract.length} extract upgrade</span>
+      <span style="color:var(--purple)">${extract.length} extract upgrade</span> &nbsp;·&nbsp;
+      <span style="color:var(--text-muted)">${vendor.length} vendor</span>
       ${ectoPrice ? `&nbsp;·&nbsp; Ecto: ${formatCopper(ectoPrice)}` : ''}
     </span>
   </div>`;
@@ -626,6 +628,7 @@ function renderSalvageResults(items, ectoPrice) {
   html += renderSection(extract, '💎 Extract upgrade first (Black Lion Kit)');
   html += renderSection(sells,   '✅ Sell on Trading Post');
   html += renderSection(salvage, '🔨 Salvage for materials');
+  html += renderSection(vendor,  '🏪 Sell to vendor (no TP/salvage value)');
 
   setTabContent('salvage', html);
   document.querySelectorAll('#tabpanel-salvage .salvage-header').forEach(h => {
@@ -638,8 +641,8 @@ function renderSalvageCard(item) {
     ? `<img class="item-icon" src="${item.icon}" alt="" loading="lazy" onerror="this.style.display='none'">`
     : `<div class="item-icon-placeholder">⚔</div>`;
 
-  const actionClass = { sell:'sell', salvage:'salvage', extract:'extract' }[item.action] || '';
-  const actionLabel = { sell:'Sell', salvage:'Salvage', extract:'Extract Upgrade' }[item.action] || '?';
+  const actionClass = { sell:'sell', salvage:'salvage', extract:'extract', vendor:'vendor' }[item.action] || '';
+  const actionLabel = { sell:'Sell', salvage:'Salvage', extract:'Extract Upgrade', vendor:'Sell to Vendor' }[item.action] || '?';
 
   const location = item.location === 'bank' ? '<span class="tag tag-disc">Bank</span>' : `<span class="tag tag-disc">${item.location}</span>`;
 

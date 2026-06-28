@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GW2 Wiki Overlay</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  html, body { background: transparent; }
+  .overlay { display: flex; flex-direction: column; height: 100vh; background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+
+  .titlebar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); -webkit-app-region: drag; flex-shrink: 0; cursor: grab; }
+  .titlebar .title { font-size: 12px; font-weight: 600; color: var(--gold); letter-spacing: 0.02em; flex: 1; }
+  .titlebar button { -webkit-app-region: no-drag; }
+
+  .icon-btn { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius-sm); width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; flex-shrink: 0; }
+  .icon-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  .search-bar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+  .search-bar input {
+    flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text-primary); padding: 6px 9px; font-size: 12px; font-family: var(--font-ui); outline: none;
+  }
+  .search-bar input:focus { border-color: var(--gold-dim); }
+  .search-bar button {
+    background: var(--gold); color: var(--bg-deep); border: none; border-radius: var(--radius-sm);
+    padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0;
+  }
+  .search-bar button:hover { opacity: 0.9; }
+
+  .content { flex: 1; overflow-y: auto; position: relative; }
+  .content iframe { width: 100%; height: 100%; border: none; display: none; }
+  .content iframe.active { display: block; }
+
+  .results { padding: 6px; }
+  .result-item {
+    padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px;
+    color: var(--text-primary); border: 1px solid transparent;
+  }
+  .result-item:hover { background: var(--bg-elevated); border-color: var(--border); }
+  .empty-hint { padding: 20px 14px; font-size: 12px; color: var(--text-muted); text-align: center; line-height: 1.6; }
+
+  .page-toolbar { display: none; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border-light); }
+  .page-toolbar.active { display: flex; }
+  .page-toolbar .back-btn { font-size: 12px; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 4px; }
+  .page-toolbar .back-btn:hover { color: var(--gold); }
+  .page-toolbar .page-title { font-size: 12px; color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="overlay">
+  <div class="titlebar">
+    <span class="title">📖 GW2 Wiki</span>
+    <button class="icon-btn" id="closeBtn" title="Hide (toggle with hotkey)">✕</button>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Search the wiki…" autocomplete="off" autofocus/>
+    <button id="searchBtn">Search</button>
+  </div>
+
+  <div class="page-toolbar" id="pageToolbar">
+    <span class="back-btn" id="backBtn">← Back to search</span>
+    <span class="page-title" id="pageTitle"></span>
+  </div>
+
+  <div class="content">
+    <div class="results" id="results">
+      <div class="empty-hint">Type a search term above — items, achievements, mobs, mechanics, anything on the wiki.</div>
+    </div>
+    <iframe id="pageFrame"></iframe>
+  </div>
+</div>
+<script src="overlay.js"></script>
+</body>
+</html>
