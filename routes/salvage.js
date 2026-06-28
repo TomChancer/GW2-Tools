@@ -77,24 +77,47 @@ router.post('/salvage', async (req, res) => {
     const itemMap = {};
     dbItems.forEach(i => itemMap[i.id] = i);
 
-    // Only fetch from API what's genuinely missing from DB
-    const missing = uniqueItemIds.filter(id => !itemMap[id]);
-    if (missing.length) {
-      console.log(`[Salvage] Fetching ${missing.length} unknown items from API...`);
-      const fetched = await fetchItems(missing);
+    // Fetch anything missing entirely OR missing its item_type. The latter matters here:
+    // type-backfill normally only runs for items that show up in tp_prices, but soulbound/
+    // account-bound gear (exactly what people salvage) never gets TP-listed, so it never
+    // gets typed through that path — we need the type to filter correctly below.
+    const needsFetch = uniqueItemIds.filter(id => !itemMap[id] || !itemMap[id].item_type);
+    if (needsFetch.length) {
+      console.log(`[Salvage] Fetching ${needsFetch.length} items missing data/type from API...`);
+      const fetched = await fetchItems(needsFetch);
       const rows = fetched.filter(i=>i&&i.id).map(i=>({
         id:i.id, name:i.name, icon:i.icon||null, rarity:i.rarity||'Basic',
         vendor_value:i.vendor_value||0, flags:JSON.stringify(i.flags||[]), tradable:1,
       }));
       db.upsertItems(rows);
-      rows.forEach(i => itemMap[i.id] = i);
+      const typed = fetched.filter(i => i && i.id && i.type).map(i => ({
+        id: i.id, type: i.type, subtype: (i.details && i.details.type) || null,
+      }));
+      db.updateItemTypes(typed);
+      // Merge type into itemMap directly — db.updateItemTypes only writes when NULL,
+      // but we need it in this in-memory map right now regardless of what was already stored.
+      fetched.forEach(i => {
+        if (i && i.id) {
+          itemMap[i.id] = { ...(itemMap[i.id] || {}), id: i.id, name: i.name, icon: i.icon||null,
+            rarity: i.rarity||'Basic', vendor_value: i.vendor_value||0,
+            flags: JSON.stringify(i.flags||[]), tradable: 1, item_type: i.type || null };
+        }
+      });
     }
 
     // ── Step 4: Filter to salvageable items at or above minRarity ───────────
+    // Salvageable equipment slots per the GW2 wiki: Weapon, Armor, Back, Trinket — rarity
+    // doesn't restrict eligibility for those. The real exclusions (starter gear, karma/coin
+    // purchases, level rewards) are encoded by ArenaNet via the NoSalvage flag, not by type/rarity.
+    const SALVAGEABLE_TYPES = new Set(['Weapon', 'Armor', 'Back', 'Trinket']);
     const equippable = rawItems.filter(slot => {
       const item = itemMap[slot.id];
       if (!item) return false;
-      return (RARITY_ORDER[item.rarity] || 0) >= minRarity;
+      if ((RARITY_ORDER[item.rarity] || 0) < minRarity) return false;
+      if (!SALVAGEABLE_TYPES.has(item.item_type)) return false;
+      const flags = JSON.parse(item.flags || '[]');
+      if (flags.includes('NoSalvage')) return false;
+      return true;
     });
 
     console.log(`[Salvage] ${equippable.length} equippable items after rarity filter`);
