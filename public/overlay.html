@@ -27,11 +27,12 @@
   }
   .search-bar button:hover { opacity: 0.9; }
 
-  .content { flex: 1; overflow-y: auto; position: relative; }
-  .content iframe { width: 100%; height: 100%; border: none; display: none; }
-  .content iframe.active { display: block; }
+  .content { flex: 1; position: relative; overflow: hidden; }
+  .content iframe, .content .results { position: absolute; inset: 0; display: none; }
+  .content iframe.active, .content .results.active { display: block; }
+  .content iframe { width: 100%; height: 100%; border: none; }
 
-  .results { padding: 6px; }
+  .results { padding: 6px; overflow-y: auto; }
   .result-item {
     padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px;
     color: var(--text-primary); border: 1px solid transparent;
@@ -68,7 +69,7 @@
   </div>
 
   <div class="content">
-    <div class="results" id="results">
+    <div class="results active" id="results">
       <div class="empty-hint">Type a search term above — items, achievements, mobs, mechanics, anything on the wiki.</div>
     </div>
     <iframe id="pageFrame"></iframe>

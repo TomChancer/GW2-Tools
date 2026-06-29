@@ -54,6 +54,7 @@ function renderResults(results) {
 function openPage(title, url) {
   els.pageFrame.src = url;
   els.pageFrame.classList.add('active');
+  els.results.classList.remove('active');
   els.pageTitle.textContent = title;
   els.pageToolbar.classList.add('active');
   els.searchInput.parentElement.style.display = 'none';
@@ -62,6 +63,7 @@ function openPage(title, url) {
 function showSearchView() {
   els.pageFrame.classList.remove('active');
   els.pageFrame.src = '';
+  els.results.classList.add('active');
   els.pageToolbar.classList.remove('active');
   els.searchInput.parentElement.style.display = 'flex';
   els.searchInput.focus();
