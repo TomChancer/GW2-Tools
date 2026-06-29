@@ -154,6 +154,43 @@ function initSchema(db) {
       PRIMARY KEY (achievement_id, bit_index)
     );
     CREATE INDEX IF NOT EXISTS idx_abit_item ON achievement_bits(item_id);
+
+    -- Boss/meta event timers — synced from the GW2 wiki's own community-maintained
+    -- timer widget data (no official API for this; see routes/timers.js)
+    CREATE TABLE IF NOT EXISTS event_groups (
+      key      TEXT PRIMARY KEY,
+      category TEXT,
+      name     TEXT,
+      link     TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS event_segments (
+      group_key   TEXT NOT NULL,
+      segment_ref TEXT NOT NULL,
+      name        TEXT,
+      link        TEXT,
+      chatlink    TEXT,
+      bg          TEXT,
+      PRIMARY KEY (group_key, segment_ref)
+    );
+
+    -- seq_type: 'partial' (one-time prefix right after UTC midnight) or 'pattern' (repeats after)
+    CREATE TABLE IF NOT EXISTS event_sequences (
+      group_key    TEXT NOT NULL,
+      seq_type     TEXT NOT NULL,
+      order_index  INTEGER NOT NULL,
+      segment_ref  TEXT NOT NULL,
+      duration_min INTEGER NOT NULL,
+      PRIMARY KEY (group_key, seq_type, order_index)
+    );
+
+    -- Only groups the user has explicitly toggled get a row here; absence = not tracked
+    CREATE TABLE IF NOT EXISTS tracked_events (
+      group_key      TEXT PRIMARY KEY,
+      enabled        INTEGER NOT NULL DEFAULT 1,
+      notify_minutes INTEGER NOT NULL DEFAULT 10,
+      last_notified  INTEGER NOT NULL DEFAULT 0
+    );
   `);
 }
 
@@ -537,6 +574,82 @@ function getMissingAchievementItems() {
   `).map(r => r.item_id);
 }
 
+// ── Event timers ──────────────────────────────────────────────────────────────
+
+// Full wipe + reinsert each sync — the wiki data is the sole source of truth for
+// groups/segments/sequences, so there's nothing user-owned to merge here.
+// `groups` shape mirrors the wiki's own data.json: { key: { category, name, link,
+// segments: { ref: {name, link, chatlink, bg} }, sequences: { partial: [...], pattern: [...] } } }
+function upsertEventTimerData(groups) {
+  _db.run('DELETE FROM event_sequences');
+  _db.run('DELETE FROM event_segments');
+  _db.run('DELETE FROM event_groups');
+
+  const gStmt = _db.prepare('INSERT INTO event_groups (key, category, name, link) VALUES (?, ?, ?, ?)');
+  const sStmt = _db.prepare('INSERT INTO event_segments (group_key, segment_ref, name, link, chatlink, bg) VALUES (?, ?, ?, ?, ?, ?)');
+  const qStmt = _db.prepare('INSERT INTO event_sequences (group_key, seq_type, order_index, segment_ref, duration_min) VALUES (?, ?, ?, ?, ?)');
+
+  for (const [key, g] of Object.entries(groups)) {
+    gStmt.run([key, g.category || '', g.name || '', g.link || null]);
+    for (const [ref, seg] of Object.entries(g.segments || {})) {
+      sStmt.run([key, ref, seg.name || '', seg.link || null, seg.chatlink || null, JSON.stringify(seg.bg || null)]);
+    }
+    (g.sequences?.partial || []).forEach((seg, i) => qStmt.run([key, 'partial', i, String(seg.r), seg.d]));
+    (g.sequences?.pattern || []).forEach((seg, i) => qStmt.run([key, 'pattern', i, String(seg.r), seg.d]));
+  }
+  gStmt.free(); sStmt.free(); qStmt.free();
+  save();
+}
+
+// Reassembles the full nested shape (matching the original wiki data.json) for the
+// schedule-computation algorithm to consume, plus merges in the user's tracking state.
+function getFullEventData() {
+  const groups   = queryAll('SELECT * FROM event_groups');
+  const segments = queryAll('SELECT * FROM event_segments');
+  const seqs      = queryAll('SELECT * FROM event_sequences ORDER BY group_key, seq_type, order_index');
+  const tracked   = queryAll('SELECT * FROM tracked_events');
+
+  const trackedMap = {};
+  for (const t of tracked) trackedMap[t.group_key] = t;
+
+  const segByGroup = {};
+  for (const s of segments) (segByGroup[s.group_key] = segByGroup[s.group_key] || {})[s.segment_ref] = {
+    name: s.name, link: s.link, chatlink: s.chatlink, bg: JSON.parse(s.bg || 'null'),
+  };
+
+  const seqByGroup = {};
+  for (const q of seqs) {
+    const g = (seqByGroup[q.group_key] = seqByGroup[q.group_key] || { partial: [], pattern: [] });
+    g[q.seq_type].push({ r: q.segment_ref, d: q.duration_min });
+  }
+
+  return groups.map(g => ({
+    key: g.key, category: g.category, name: g.name, link: g.link,
+    segments: segByGroup[g.key] || {},
+    sequences: seqByGroup[g.key] || { partial: [], pattern: [] },
+    tracked: !!trackedMap[g.key]?.enabled,
+    notifyMinutes: trackedMap[g.key]?.notify_minutes ?? 10,
+  }));
+}
+
+function getTrackedEvents() {
+  return queryAll('SELECT * FROM tracked_events WHERE enabled = 1');
+}
+
+function setTrackedEvent(groupKey, enabled, notifyMinutes) {
+  _db.run(`
+    INSERT INTO tracked_events (group_key, enabled, notify_minutes, last_notified)
+    VALUES (?, ?, ?, 0)
+    ON CONFLICT(group_key) DO UPDATE SET enabled = excluded.enabled, notify_minutes = excluded.notify_minutes
+  `, [groupKey, enabled ? 1 : 0, notifyMinutes]);
+  save();
+}
+
+function setLastNotified(groupKey, timestamp) {
+  _db.run('UPDATE tracked_events SET last_notified = ? WHERE group_key = ?', [timestamp, groupKey]);
+  save();
+}
+
 // All collections with their bits + current sell price — used to rank
 // a player's incomplete collections by remaining TP cost (account data layered in by the caller).
 function getAllCollectionsWithBits() {
@@ -760,4 +873,6 @@ module.exports = {
   upsertAchievementCategories, upsertAchievements,
   getAchievementCollectionCategories, searchCollections,
   getCollectionDetail, getMissingAchievementItems, getAllCollectionsWithBits,
+  // Event timers
+  upsertEventTimerData, getFullEventData, getTrackedEvents, setTrackedEvent, setLastNotified,
 };

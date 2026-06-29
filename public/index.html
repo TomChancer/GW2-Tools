@@ -360,6 +360,30 @@
   .bit-wiki:hover { color: var(--text-primary); }
   .bit-item.bit-done { background: var(--bg-input); border-color: transparent; }
 
+  /* ── Timers ── */
+  .timeline-wrap { padding: 16px; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+  .timeline-axis { position: relative; height: 22px; margin-left: 180px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+  .timeline-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border-light); padding-left: 4px; font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+  .timeline-rows { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 8px; }
+
+  .timeline-row { display: flex; align-items: stretch; height: 40px; flex-shrink: 0; }
+  .timeline-row-label { width: 180px; flex-shrink: 0; padding-right: 10px; display: flex; flex-direction: column; justify-content: center; font-size: 12px; color: var(--text-primary); overflow: hidden; }
+  .timeline-row-label .cat { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .timeline-row-track { position: relative; flex: 1; background: var(--bg-elevated); border-radius: var(--radius-sm); overflow: hidden; }
+
+  .timeline-segment { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 6px; font-size: 11px; color: #1a1a1a; overflow: hidden; white-space: nowrap; border-right: 1px solid rgba(0,0,0,0.15); }
+  .timeline-segment.unnamed { color: transparent; }
+
+  .timeline-now-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); z-index: 5; pointer-events: none; }
+  .timeline-now-line::after { content: 'now'; position: absolute; top: -16px; left: -10px; font-size: 9px; color: var(--red); font-weight: 600; }
+
+  .timer-config-category { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gold); padding: 10px 0 6px; border-bottom: 1px solid var(--border-light); margin-top: 8px; }
+  .timer-config-category:first-child { margin-top: 0; }
+  .timer-config-row { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: 12px; }
+  .timer-config-row label { flex: 1; color: var(--text-primary); cursor: pointer; }
+  .timer-notify-input { width: 50px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); padding: 3px 5px; font-size: 11px; text-align: center; }
+  .timer-notify-label { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -405,6 +429,9 @@
     </div>
     <div class="tab" data-tab="collections">
       <span class="tab-icon">📖</span> Collections
+    </div>
+    <div class="tab" data-tab="timers">
+      <span class="tab-icon">⏱</span> Timers
     </div>
   </div>
 
@@ -665,6 +692,28 @@
 
       </div>
 
+      <!-- Timers sidebar -->
+      <div class="sidebar-panel" id="panel-timers">
+
+        <div class="sidebar-section">
+          <h3>Tracked events</h3>
+          <button class="btn btn-ghost btn-full" id="timersConfigBtn">⚙ Configure events</button>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6;">
+            Pick which bosses/metas to show on the timeline and get notified before. Notifications require the desktop app (not the browser).
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Data source</h3>
+          <div class="sync-banner never" id="timersSyncBanner">Not yet synced</div>
+          <button class="btn btn-ghost btn-full" id="timersSyncBtn" style="margin-top:8px;">↺ Sync timer data</button>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6;">
+            Schedule data comes from the GW2 wiki's own community-maintained timer (no official API for this). Refreshes weekly.
+          </div>
+        </div>
+
+      </div>
+
     </aside>
 
     <!-- Content -->
@@ -712,6 +761,21 @@
         </div>
       </div>
 
+      <!-- Timers panel -->
+      <div class="tab-panel" id="tabpanel-timers">
+        <div class="empty-state" id="timersEmptyState">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4">
+            <circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 1h6"/>
+          </svg>
+          <p>No events tracked yet. Click <strong>Configure events</strong> in the sidebar to pick bosses/metas to follow.</p>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Sync timer data first if this is your first visit.</p>
+        </div>
+        <div class="timeline-wrap" id="timelineWrap" style="display:none;">
+          <div class="timeline-axis" id="timelineAxis"></div>
+          <div class="timeline-rows" id="timelineRows"></div>
+        </div>
+      </div>
+
       <!-- Forge panel -->
       <div class="tab-panel" id="tabpanel-forge">
         <div class="empty-state">
@@ -749,6 +813,19 @@
           <tr><td style="color:var(--text-secondary);padding:2px 0;"><strong>achievements</strong></td><td style="text-align:right;">Collections</td></tr>
         </table>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Timers config modal -->
+<div class="modal-overlay" id="timersConfigModal">
+  <div class="modal-panel" style="width:560px;max-height:82vh;display:flex;flex-direction:column;">
+    <div class="modal-header">
+      <h3>Configure Event Timers</h3>
+      <button class="modal-close" id="timersConfigCloseBtn">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;flex:1;padding-top:10px;" id="timersConfigBody">
+      <div class="empty-hint" style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">Loading…</div>
     </div>
   </div>
 </div>

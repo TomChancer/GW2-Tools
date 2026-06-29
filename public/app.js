@@ -88,6 +88,7 @@ async function checkDbStatus() {
 // (checking/downloading), slow otherwise. Row stays hidden entirely when not
 // running inside the packaged Electron app (status: 'unsupported').
 let appUpdatePollTimer = null;
+let timersRefreshInterval = null;
 
 async function pollAppUpdateStatus() {
   try {
@@ -193,8 +194,16 @@ function bindEvents() {
     if (e.target.id === 'settingsModal') closeSettings();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeSettings();
+    if (e.key === 'Escape') { closeSettings(); closeTimersConfig(); }
   });
+
+  // Timers
+  document.getElementById('timersConfigBtn').addEventListener('click', openTimersConfig);
+  document.getElementById('timersConfigCloseBtn').addEventListener('click', closeTimersConfig);
+  document.getElementById('timersConfigModal').addEventListener('click', (e) => {
+    if (e.target.id === 'timersConfigModal') closeTimersConfig();
+  });
+  document.getElementById('timersSyncBtn').addEventListener('click', triggerTimersSync);
 
   // Craft controls
   document.getElementById('partialToggle').addEventListener('click', () => {
@@ -269,6 +278,14 @@ function switchTab(tab) {
     loadCollectionCategories();
     pollAchieveSyncStatus();
     searchCollections();
+  }
+  if (tab === 'timers') {
+    pollTimersSyncStatus();
+    loadTimersSchedule();
+    clearInterval(timersRefreshInterval);
+    timersRefreshInterval = setInterval(loadTimersSchedule, 60000);
+  } else {
+    clearInterval(timersRefreshInterval);
   }
 }
 
@@ -1628,4 +1645,149 @@ function formatCopperPlain(copper) {
 
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── TIMERS ───────────────────────────────────────────────────────────────────
+
+let timersSyncPollTimer = null;
+
+async function pollTimersSyncStatus() {
+  clearTimeout(timersSyncPollTimer);
+  try {
+    const data = await fetch('/api/timers/sync-status').then(r => r.json());
+    updateTimersSyncBanner(data);
+    if (data.status === 'running') timersSyncPollTimer = setTimeout(pollTimersSyncStatus, 2000);
+  } catch(e) {}
+}
+
+function updateTimersSyncBanner(data) {
+  const el = document.getElementById('timersSyncBanner');
+  if (!el) return;
+  if (data.status === 'running') {
+    el.className = 'sync-banner running';
+    el.textContent = 'Syncing timer data…';
+  } else if (data.status === 'done') {
+    el.className = 'sync-banner done';
+    el.textContent = `Last synced ${formatAgo(data.lastSync)}`;
+  } else {
+    el.className = 'sync-banner never';
+    el.textContent = 'Not yet synced';
+  }
+}
+
+async function triggerTimersSync() {
+  try { await fetch('/api/timers/sync', { method: 'POST' }); } catch(e) {}
+  pollTimersSyncStatus();
+}
+
+function bgToCss(bg) {
+  if (!bg) return 'var(--bg-elevated)';
+  if (Array.isArray(bg[0])) return `linear-gradient(to right, rgb(${bg[0].join(',')}), rgb(${bg[1].join(',')}))`;
+  return `rgb(${bg.join(',')})`;
+}
+
+async function loadTimersSchedule() {
+  try {
+    const data = await fetch('/api/timers/schedule?onlyTracked=true&hoursBack=0.5&hoursForward=3.5').then(r => r.json());
+    if (!data.ok) throw new Error(data.error || 'Failed');
+    renderTimeline(data);
+  } catch(e) { /* silent — sync banner already reports server/data issues */ }
+}
+
+function renderTimeline(data) {
+  const emptyState = document.getElementById('timersEmptyState');
+  const wrap       = document.getElementById('timelineWrap');
+  if (!data.groups.length) {
+    emptyState.style.display = 'flex';
+    wrap.style.display = 'none';
+    return;
+  }
+  emptyState.style.display = 'none';
+  wrap.style.display = 'flex';
+
+  const { now, windowStart, windowEnd, groups } = data;
+  const totalMs = windowEnd - windowStart;
+  const nowPct  = (now - windowStart) / totalMs * 100;
+
+  let axisHtml = '';
+  const firstHour = Math.ceil(windowStart / 3600000) * 3600000;
+  for (let t = firstHour; t < windowEnd; t += 3600000) {
+    const pct = (t - windowStart) / totalMs * 100;
+    axisHtml += `<div class="timeline-tick" style="left:${pct}%">${new Date(t).toISOString().substr(11, 5)}</div>`;
+  }
+  document.getElementById('timelineAxis').innerHTML = axisHtml;
+
+  let rowsHtml = '';
+  for (const g of groups) {
+    let segHtml = '';
+    for (const seg of g.segments) {
+      const left  = Math.max(0, (seg.start - windowStart) / totalMs * 100);
+      const right = Math.min(100, (seg.end - windowStart) / totalMs * 100);
+      if (right - left <= 0) continue;
+      const unnamed = seg.name ? '' : ' unnamed';
+      segHtml += `<div class="timeline-segment${unnamed}" style="left:${left}%;width:${right-left}%;background:${bgToCss(seg.bg)};" title="${escHtml(seg.name||'')}">${escHtml(seg.name||'')}</div>`;
+    }
+    rowsHtml += `<div class="timeline-row">
+      <div class="timeline-row-label"><div class="cat">${escHtml(g.category)}</div><div>${escHtml(g.name)}</div></div>
+      <div class="timeline-row-track">${segHtml}<div class="timeline-now-line" style="left:${nowPct}%"></div></div>
+    </div>`;
+  }
+  document.getElementById('timelineRows').innerHTML = rowsHtml;
+}
+
+// ── Timers config modal ───────────────────────────────────────────────────────
+
+async function openTimersConfig() {
+  document.getElementById('timersConfigModal').classList.add('active');
+  const body = document.getElementById('timersConfigBody');
+  body.innerHTML = `<div class="empty-hint" style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">Loading…</div>`;
+  try {
+    const data = await fetch('/api/timers/groups').then(r => r.json());
+    if (!data.ok) throw new Error(data.error || 'Failed');
+    renderTimersConfig(data.groups);
+  } catch(e) {
+    body.innerHTML = `<div class="banner err">Failed to load: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function closeTimersConfig() {
+  document.getElementById('timersConfigModal').classList.remove('active');
+}
+
+function renderTimersConfig(groups) {
+  const byCategory = {};
+  for (const g of groups) (byCategory[g.category || 'Other'] = byCategory[g.category || 'Other'] || []).push(g);
+
+  let html = '';
+  for (const [category, list] of Object.entries(byCategory)) {
+    html += `<div class="timer-config-category">${escHtml(category)}</div>`;
+    for (const g of list) {
+      html += `<div class="timer-config-row">
+        <input type="checkbox" id="track-${g.key}" data-key="${g.key}" ${g.tracked ? 'checked' : ''}>
+        <label for="track-${g.key}">${escHtml(g.name)}</label>
+        <span class="timer-notify-label">notify</span>
+        <input type="number" class="timer-notify-input" data-key="${g.key}" value="${g.notifyMinutes}" min="1" max="180">
+        <span class="timer-notify-label">min before</span>
+      </div>`;
+    }
+  }
+  document.getElementById('timersConfigBody').innerHTML = html;
+
+  document.querySelectorAll('#timersConfigBody input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => saveTimerTracking(cb.dataset.key));
+  });
+  document.querySelectorAll('#timersConfigBody input[type="number"]').forEach(inp => {
+    inp.addEventListener('change', () => saveTimerTracking(inp.dataset.key));
+  });
+}
+
+async function saveTimerTracking(groupKey) {
+  const checkbox = document.getElementById(`track-${groupKey}`);
+  const numInput = document.querySelector(`.timer-notify-input[data-key="${groupKey}"]`);
+  try {
+    await apiFetch('/api/timers/track', {
+      groupKey, enabled: checkbox.checked, notifyMinutes: parseInt(numInput.value) || 10,
+    });
+    if (state.activeTab === 'timers') loadTimersSchedule();
+  } catch(e) {}
 }

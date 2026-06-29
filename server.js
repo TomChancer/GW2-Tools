@@ -28,6 +28,7 @@ app.post('/api/validate-key', async (req, res) => {
 const flip        = require('./routes/flip');
 const collections = require('./routes/collections');
 const appUpdate    = require('./routes/app-update');
+const timers       = require('./routes/timers');
 
 app.use('/api', require('./routes/craft'));
 app.use('/api', require('./routes/salvage'));
@@ -37,6 +38,7 @@ app.use('/api/flip', flip.router);
 app.use('/api/collections', collections.router);
 app.use('/api/app-update', appUpdate.router);
 app.use('/api/wiki', require('./routes/wiki'));
+app.use('/api/timers', timers.router);
 
 // ── Hourly price history scheduler ───────────────────────────────────────────
 // Runs at the top of every hour to snapshot prices for all recipe-relevant items
@@ -113,6 +115,7 @@ async function start() {
   flip.start();
   collections.start();
   appUpdate.start();
+  timers.start();
 
   return PORT;
 }

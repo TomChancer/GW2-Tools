@@ -17,6 +17,14 @@ let isQuitting    = false;
 let serverPort    = null;
 let pinInterval   = null;
 
+// Windows ties native toast notifications to a registered AppUserModelID — without
+// this, Notification.show() often fails silently (no error, nothing appears),
+// especially in dev-mode runs that don't have a Start Menu shortcut. Must match
+// the appId in package.json's build config for the installed app's shortcut to agree.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.ringo.gw2tools');
+}
+
 async function createWindow() {
   const { start } = require('../server');
   serverPort = await start();
