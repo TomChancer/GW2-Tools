@@ -57,6 +57,11 @@ router.post('/check', (req, res) => {
 router.post('/download', (req, res) => {
   if (!autoUpdater) return res.json({ ok: false, error: 'Updater not available in this build' });
   if (state.status !== 'available') return res.json({ ok: false, error: 'No update available to download' });
+  // Set this synchronously, before kicking off the actual (async) download — electron-updater's
+  // own 'download-progress' event has a startup delay, and a poll landing in that gap would
+  // otherwise still see 'available' and incorrectly re-render the clickable state.
+  state.status   = 'downloading';
+  state.progress = 0;
   autoUpdater.downloadUpdate().catch(e => { state.status = 'error'; state.error = e.message; });
   res.json({ ok: true });
 });
