@@ -7,31 +7,62 @@ const db = require('../db');
 let syncRunning  = false;
 const syncProgress = { done: 0, total: 0 };
 
+// A score that balances absolute profit, capital efficiency (ROI), and market liquidity.
+// Sorting by raw profit alone surfaces expensive but slow-moving items;
+// ROI alone surfaces cheap items that tie up little capital but earn little.
+// Log-scaling buy_quantity means liquidity has diminishing returns — going from
+// 100 → 1000 orders matters, but 10,000 → 100,000 is marginal.
+function calcFlipScore(profitCopper, roiPct, buyQty) {
+  return profitCopper * (1 + roiPct / 100) * Math.log10(buyQty + 1);
+}
+
+// Assign A/B/C grades by percentile within the returned set, so grades are
+// always relative to what's currently available — not absolute thresholds that
+// mean nothing when the market is quiet.
+function assignGrades(items) {
+  if (!items.length) return items;
+  items.sort((a, b) => b.score - a.score);
+  const n   = items.length;
+  const cutA = Math.ceil(n * 0.25); // top 25% → A
+  const cutB = Math.ceil(n * 0.65); // next 40% → B, bottom 35% → C
+  return items.map((item, i) => ({ ...item, grade: i < cutA ? 'A' : i < cutB ? 'B' : 'C' }));
+}
+
 router.post('/', (req, res) => {
   const {
-    quickMinProfit    = 1000,
+    quickMinProfit    = 5000,
     quickDropPct      = 20,
     quickMinSnaps     = 5,
-    normalMinProfit   = 1000,
-    normalMinROI      = 15,
-    normalMinBuyQty   = 50,
-    normalMinSellQty  = 10,
+    normalMinProfit   = 5000,
+    normalMinROI      = 20,
+    normalMinBuyQty   = 250,
+    normalMinSellQty  = 50,
     normalMaxBuyPrice = 0,
     normalMaxSpread   = 2.0,
     itemType          = null,
     itemSubtype       = null,
-    limit             = 50,
+    limit             = 75,
   } = req.body;
 
   try {
-    const quickWins   = db.getQuickWins({ minProfit: quickMinProfit, dropPct: quickDropPct, minSnapshots: quickMinSnaps, limit });
-    const normalFlips = db.getNormalFlips({
+    const quickWinsRaw = db.getQuickWins({ minProfit: quickMinProfit, dropPct: quickDropPct, minSnapshots: quickMinSnaps, limit });
+    const quickWins = assignGrades(quickWinsRaw.map(f => ({
+      ...f,
+      score: Math.round(calcFlipScore(f.expected_profit, f.drop_pct, f.buy_quantity)),
+    })));
+
+    const normalFlipsRaw = db.getNormalFlips({
       minProfit: normalMinProfit, minROI: normalMinROI,
       minBuyQty: normalMinBuyQty, minSellQty: normalMinSellQty,
       maxBuyPrice: normalMaxBuyPrice, maxSpreadRatio: normalMaxSpread,
       itemType, itemSubtype, limit,
     });
-    const watchedIds  = db.getWatchedItems().map(w => w.item_id);
+    const normalFlips = assignGrades(normalFlipsRaw.map(f => ({
+      ...f,
+      score: Math.round(calcFlipScore(f.flip_profit, f.roi_pct, f.buy_quantity)),
+    })));
+
+    const watchedIds = db.getWatchedItems().map(w => w.item_id);
     res.json({ ok: true, quickWins, normalFlips, watchedIds });
   } catch(e) {
     console.error('[Flip]', e);

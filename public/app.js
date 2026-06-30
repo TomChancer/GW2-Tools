@@ -871,6 +871,14 @@ function onCategoryChange() {
   }
 }
 
+function toggleFlipAdvanced() {
+  const sec   = document.getElementById('flipAdvancedSection');
+  const arrow = document.getElementById('flipAdvancedArrow');
+  const open  = sec.style.display === 'flex';
+  sec.style.display  = open ? 'none' : 'flex';
+  arrow.textContent  = open ? '▸' : '▾';
+}
+
 async function runFlipAnalysis() {
   if (state.analyzing) return;
   state.analyzing = true;
@@ -878,21 +886,24 @@ async function runFlipAnalysis() {
   btn.disabled = true; btn.textContent = '⏳ Scanning…';
   setTabLoading('flipping', 'Scanning for flip opportunities…');
 
-  const itemType    = document.getElementById('nfCategory').value    || null;
-  const itemSubtype = document.getElementById('nfSubcategory').value || null;
+  const minProfitSilver = parseFloat(document.getElementById('flipMinProfit').value) || 50;
+  const minProfitCopper = Math.round(minProfitSilver * 100);
+  const maxBudgetCopper = Math.round((parseFloat(document.getElementById('flipMaxBudget').value) || 0) * 10000);
+  const itemType        = document.getElementById('nfCategory').value    || null;
+  const itemSubtype     = document.getElementById('nfSubcategory').value || null;
 
   try {
     const data = await apiFetch('/api/flip', {
-      quickMinProfit:   Math.round((parseFloat(document.getElementById('qwMinProfit').value) || 10) * 100),
-      quickDropPct:     parseFloat(document.getElementById('qwDropPct').value) || 20,
-      normalMinProfit:  Math.round((parseFloat(document.getElementById('nfMinProfit').value) || 10) * 100),
-      normalMinROI:     parseFloat(document.getElementById('nfMinROI').value) || 15,
-      normalMinBuyQty:  parseInt(document.getElementById('nfMinBuyQty').value) || 50,
-      normalMaxBuyPrice: Math.round((parseFloat(document.getElementById('nfMaxBuy').value) || 0) * 10000),
-      normalMaxSpread:  parseFloat(document.getElementById('nfMaxSpread').value) || 2.0,
+      quickMinProfit:    minProfitCopper,
+      quickDropPct:      20,
+      normalMinProfit:   minProfitCopper,
+      normalMinROI:      parseFloat(document.getElementById('nfMinROI').value)    || 20,
+      normalMinBuyQty:   parseInt(document.getElementById('nfMinBuyQty').value)   || 250,
+      normalMaxBuyPrice: maxBudgetCopper,
+      normalMaxSpread:   parseFloat(document.getElementById('nfMaxSpread').value) || 2.0,
       itemType,
       itemSubtype,
-      limit: 50,
+      limit: 75,
     });
 
     state.watchedIds  = new Set((data.watchedIds || []).map(Number));
@@ -945,112 +956,92 @@ function renderFlipResults() {
 }
 
 function renderQuickWinCard(item) {
-  const isWatched  = state.watchedIds.has(item.item_id);
-  const icon = item.icon
+  const isWatched      = state.watchedIds.has(item.item_id);
+  const icon           = item.icon
     ? `<img class="item-icon" src="${item.icon}" alt="" loading="lazy" onerror="this.style.display='none'">`
     : `<div class="item-icon-placeholder">⚡</div>`;
+  const gradeCls       = `grade-${(item.grade || 'C').toLowerCase()}`;
+  const gradeBadge     = `<span class="flip-grade ${gradeCls}" title="Grade ${item.grade} opportunity">${item.grade || 'C'}</span>`;
+  const relistAt       = item.hist_sell_avg;
+  const relistAfterTax = Math.floor(relistAt * 0.85);
+  const watchBtn       = `<button class="watch-btn${isWatched ? ' watching' : ''}" onclick="toggleWatch(event,${item.item_id})">${isWatched ? '★ Watching' : '☆ Watch'}</button>`;
 
-  const liqTier  = item.buy_quantity >= 500 ? 'liquid' : item.buy_quantity >= 50 ? 'slow' : 'stale';
-  const liqLabel = liqTier === 'liquid' ? '● Liquid' : liqTier === 'slow' ? '● Slow' : '● Stale';
-  const liqTag   = `<span class="tag liq-tag liq-${liqTier}" title="${item.buy_quantity.toLocaleString()} buy orders">${liqLabel}</span>`;
-
-  const relistAfterTax = Math.floor(item.hist_sell_avg * 0.85);
-  const watchBtn = `<button class="watch-btn${isWatched ? ' watching' : ''}" onclick="toggleWatch(event,${item.item_id})">${isWatched ? '★ Watching' : '☆ Watch'}</button>`;
+  const steps = `<div class="flip-steps">
+    <div class="flip-step"><span class="flip-step-num">1</span><span class="flip-step-text">Buy this item from the Trading Post right now for <em>${formatCopperPlain(item.sell_price)}</em> (instant — no waiting)</span></div>
+    <div class="flip-step"><span class="flip-step-num">2</span><span class="flip-step-text">Relist it for <em>${formatCopperPlain(relistAt)}</em> — the normal going price (${item.drop_pct}% above what you paid)</span></div>
+    <div class="flip-step"><span class="flip-step-num">3</span><span class="flip-step-text">After the 15% Trading Post fee, collect <strong>${formatCopperPlain(item.expected_profit)}</strong> profit per item</span></div>
+  </div>`;
 
   const detail = `<div class="flip-detail">
-    <div class="flip-detail-grid">
-      <div class="detail-section">
-        <h4>Trade Details</h4>
-        <div class="price-breakdown">
-          <div class="price-row"><span class="price-row-label">Buy now (instant buy at)</span><span class="price-row-value">${formatCopper(item.sell_price)}</span></div>
-          <div class="price-row"><span class="price-row-label">7-day avg sell price</span><span class="price-row-value">${formatCopper(item.hist_sell_avg)}</span></div>
-          <div class="price-row"><span class="price-row-label">7-day peak sell price</span><span class="price-row-value" style="color:var(--text-secondary)">${formatCopper(item.hist_sell_max)}</span></div>
-          <div class="price-row" style="margin-top:6px;border-top:1px solid var(--border-light);padding-top:6px"><span class="price-row-label">Relist at avg (after 15% tax)</span><span class="price-row-value" style="color:var(--gold)">${formatCopper(relistAfterTax)}</span></div>
-          <div class="price-row total"><span class="price-row-label">Expected profit</span><span class="price-row-value profit-positive">${formatCopper(item.expected_profit)}</span></div>
-        </div>
-      </div>
-      <div class="detail-section">
-        <h4>Market Activity</h4>
-        <div class="price-breakdown">
-          <div class="price-row"><span class="price-row-label">Buy orders (demand)</span><span class="price-row-value">${item.buy_quantity.toLocaleString()}</span></div>
-          <div class="price-row"><span class="price-row-label">Sell listings (supply)</span><span class="price-row-value">${item.sell_quantity.toLocaleString()}</span></div>
-          <div class="price-row"><span class="price-row-label">History snapshots (7d)</span><span class="price-row-value">${item.snapshots}</span></div>
-          <div class="price-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-light)"><span style="font-size:11px;color:var(--text-muted)">Relist near the 7d avg — competing listings will be above it</span></div>
-        </div>
-        <div style="margin-top:10px;">${watchBtn}</div>
+    ${steps}
+    <div style="margin-top:4px;">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--gold);margin-bottom:6px;">Market snapshot</div>
+      <div class="flip-market-stats">
+        <div class="flip-stat"><span class="flip-stat-label">You pay</span><span class="flip-stat-value">${formatCopperPlain(item.sell_price)}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">You relist at</span><span class="flip-stat-value">${formatCopperPlain(relistAt)}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">TP fee (15%)</span><span class="flip-stat-value">−${formatCopperPlain(relistAt - relistAfterTax)}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">Net profit</span><span class="flip-stat-value" style="color:var(--green)">${formatCopperPlain(item.expected_profit)}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">Buy orders</span><span class="flip-stat-value">${item.buy_quantity.toLocaleString()}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">7-day avg price</span><span class="flip-stat-value">${formatCopperPlain(item.hist_sell_avg)}</span></div>
       </div>
     </div>
+    <div style="margin-top:10px;">${watchBtn}</div>
   </div>`;
 
   return `<div class="flip-card quick-win${isWatched ? ' watching' : ''}" data-item-id="${item.item_id}">
     <div class="flip-header">
       ${icon}
       <div class="item-name-wrap">
-        <div class="item-name ${item.rarity}">${escHtml(item.name)}</div>
-        <div class="item-meta">${liqTag}<span class="drop-badge">↓ ${item.drop_pct}% below avg</span></div>
+        <div class="item-name ${item.rarity || ''}">${escHtml(item.name)}</div>
+        <div class="item-meta"><span class="drop-badge">⚡ Quick Win — buy &amp; relist</span></div>
       </div>
-      <div class="col-sell"><div class="col-label">Buy now</div><div class="col-value">${formatCopper(item.sell_price)}</div><div class="col-sub">avg: ${formatCopperPlain(item.hist_sell_avg)}</div></div>
-      <div class="col-sell"><div class="col-label">Relist at</div><div class="col-value" style="color:var(--gold)">${formatCopperPlain(item.hist_sell_avg)}</div><div class="col-sub">nets: ${formatCopperPlain(relistAfterTax)}</div></div>
+      ${gradeBadge}
       <div class="col-profit"><div class="col-label">Profit</div><div class="col-value">${formatCopper(item.expected_profit)}</div></div>
       <span class="expand-icon">▼</span>
     </div>${detail}</div>`;
 }
 
 function renderNormalFlipCard(item) {
-  const isWatched  = state.watchedIds.has(item.item_id);
-  const icon = item.icon
+  const isWatched = state.watchedIds.has(item.item_id);
+  const icon      = item.icon
     ? `<img class="item-icon" src="${item.icon}" alt="" loading="lazy" onerror="this.style.display='none'">`
     : `<div class="item-icon-placeholder">📊</div>`;
+  const gradeCls   = `grade-${(item.grade || 'C').toLowerCase()}`;
+  const gradeBadge = `<span class="flip-grade ${gradeCls}" title="Grade ${item.grade} opportunity">${item.grade || 'C'}</span>`;
+  const netSell    = Math.floor(item.sell_price * 0.85);
+  const watchBtn   = `<button class="watch-btn${isWatched ? ' watching' : ''}" onclick="toggleWatch(event,${item.item_id})">${isWatched ? '★ Watching' : '☆ Watch'}</button>`;
+  const catLabel   = item.item_type ? `${labelType(item.item_type)}${item.item_subtype ? ' › ' + labelSubtype(item.item_subtype) : ''}` : '';
 
-  const liqTier  = item.buy_quantity >= 500 ? 'liquid' : item.buy_quantity >= 50 ? 'slow' : 'stale';
-  const liqLabel = liqTier === 'liquid' ? '● Liquid' : liqTier === 'slow' ? '● Slow' : '● Stale';
-  const liqTag   = `<span class="tag liq-tag liq-${liqTier}" title="${item.buy_quantity.toLocaleString()} buy orders">${liqLabel}</span>`;
-  const roiBadge = `<span class="roi-badge">${item.roi_pct}% ROI</span>`;
-  const catTag   = item.item_type
-    ? `<span class="tag tag-disc">${labelType(item.item_type)}${item.item_subtype ? ' › ' + labelSubtype(item.item_subtype) : ''}</span>`
-    : '';
-
-  const netSell   = Math.floor(item.sell_price * 0.85);
-  const watchBtn  = `<button class="watch-btn${isWatched ? ' watching' : ''}" onclick="toggleWatch(event,${item.item_id})">${isWatched ? '★ Watching' : '☆ Watch'}</button>`;
-
-  const histNote = item.snapshots > 0
-    ? `<div class="price-row"><span class="price-row-label">7d avg sell</span><span class="price-row-value">${formatCopper(item.hist_sell_avg)}</span></div>`
-    : `<div class="price-row"><span class="price-row-label">7d history</span><span class="price-row-value" style="color:var(--text-muted)">No data yet</span></div>`;
+  const steps = `<div class="flip-steps">
+    <div class="flip-step"><span class="flip-step-num">1</span><span class="flip-step-text">Place a <strong style="color:var(--blue)">buy order</strong> for <em>${formatCopperPlain(item.buy_price)}</em> — other players sell to you automatically</span></div>
+    <div class="flip-step"><span class="flip-step-num">2</span><span class="flip-step-text">Once filled, relist it on the Trading Post for <em>${formatCopperPlain(item.sell_price)}</em> (just under the current lowest listing)</span></div>
+    <div class="flip-step"><span class="flip-step-num">3</span><span class="flip-step-text">After the 15% fee, collect <strong>${formatCopperPlain(item.flip_profit)}</strong> profit — a <strong style="color:var(--green)">${item.roi_pct}% return</strong> on your investment</span></div>
+  </div>`;
 
   const detail = `<div class="flip-detail">
-    <div class="flip-detail-grid">
-      <div class="detail-section">
-        <h4>Trade Details</h4>
-        <div class="price-breakdown">
-          <div class="price-row"><span class="price-row-label">Place buy order at</span><span class="price-row-value" style="color:var(--blue)">${formatCopper(item.buy_price)}</span></div>
-          <div class="price-row"><span class="price-row-label">Lowest sell listing</span><span class="price-row-value">${formatCopper(item.sell_price)}</span></div>
-          <div class="price-row" style="margin-top:6px;border-top:1px solid var(--border-light);padding-top:6px"><span class="price-row-label">After 15% TP tax</span><span class="price-row-value">${formatCopper(netSell)}</span></div>
-          <div class="price-row total"><span class="price-row-label">Profit per flip</span><span class="price-row-value profit-positive">${formatCopper(item.flip_profit)}</span></div>
-          <div class="price-row"><span class="price-row-label">ROI</span><span class="price-row-value" style="color:var(--green)">${item.roi_pct}%</span></div>
-        </div>
-      </div>
-      <div class="detail-section">
-        <h4>Market Activity</h4>
-        <div class="price-breakdown">
-          <div class="price-row"><span class="price-row-label">Buy orders (demand)</span><span class="price-row-value">${item.buy_quantity.toLocaleString()}</span></div>
-          <div class="price-row"><span class="price-row-label">Sell listings (supply)</span><span class="price-row-value">${item.sell_quantity.toLocaleString()}</span></div>
-          ${histNote}
-          <div class="price-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-light)"><span style="font-size:11px;color:var(--text-muted)">List 1c below the lowest listing to move inventory faster</span></div>
-        </div>
-        <div style="margin-top:10px;">${watchBtn}</div>
+    ${steps}
+    <div style="margin-top:4px;">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--gold);margin-bottom:6px;">Market snapshot${catLabel ? ` · ${catLabel}` : ''}</div>
+      <div class="flip-market-stats">
+        <div class="flip-stat"><span class="flip-stat-label">Your buy order</span><span class="flip-stat-value" style="color:var(--blue)">${formatCopperPlain(item.buy_price)}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">You relist at</span><span class="flip-stat-value">${formatCopperPlain(item.sell_price)}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">TP fee (15%)</span><span class="flip-stat-value">−${formatCopperPlain(item.sell_price - netSell)}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">Net profit</span><span class="flip-stat-value" style="color:var(--green)">${formatCopperPlain(item.flip_profit)}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">Buy orders</span><span class="flip-stat-value">${item.buy_quantity.toLocaleString()}</span></div>
+        <div class="flip-stat"><span class="flip-stat-label">Sell listings</span><span class="flip-stat-value">${item.sell_quantity.toLocaleString()}</span></div>
       </div>
     </div>
+    <div style="margin-top:10px;">${watchBtn}</div>
   </div>`;
 
   return `<div class="flip-card normal-flip${isWatched ? ' watching' : ''}" data-item-id="${item.item_id}">
     <div class="flip-header">
       ${icon}
       <div class="item-name-wrap">
-        <div class="item-name ${item.rarity}">${escHtml(item.name)}</div>
-        <div class="item-meta">${liqTag}${roiBadge}${catTag}</div>
+        <div class="item-name ${item.rarity || ''}">${escHtml(item.name)}</div>
+        <div class="item-meta"><span class="roi-badge">${item.roi_pct}% ROI</span></div>
       </div>
-      <div class="col-sell"><div class="col-label">Buy order</div><div class="col-value" style="color:var(--blue)">${formatCopper(item.buy_price)}</div></div>
-      <div class="col-sell"><div class="col-label">Sell listing</div><div class="col-value">${formatCopper(item.sell_price)}</div></div>
+      ${gradeBadge}
       <div class="col-profit"><div class="col-label">Profit</div><div class="col-value">${formatCopper(item.flip_profit)}</div></div>
       <span class="expand-icon">▼</span>
     </div>${detail}</div>`;
@@ -1653,65 +1644,11 @@ function escHtml(str) {
 
 // ── TIMERS ───────────────────────────────────────────────────────────────────
 
-// Curated notable loot data — matched against (segmentName + groupName) lowercased.
-// `matches` is an array of substrings; first match wins (order matters for overlapping names).
-const NOTABLE_LOOT = [
-  {
-    idx: 0, matches: ['tequatl'], tier: 3, label: 'Tequatl the Sunless',
-    drops: ["Tequatl's Hoard chest (daily)", 'Ascended weapon (account-bound)', 'Sunrise / Twilight legendary precursor (rare random)', 'Exotic weapons & armor'],
-    note: "One of the highest-reward world bosses. The Sunrise/Twilight precursor drops are rare but worth 300–1000g+. The Ascended daily chest weapon is ~80–150g.",
-  },
-  {
-    idx: 1, matches: ['triple trouble', 'evolved jungle wurm'], tier: 3, label: 'Triple Trouble Wurm',
-    drops: ['Ascended accessories (daily chest)', 'Exotic weapons & armor', 'Rare crafting materials', 'Evolved Hatchling Tonic'],
-    note: "Requires killing three wurm heads simultaneously — needs map coordination. Daily chest yields ~30–100g.",
-  },
-  {
-    idx: 2, matches: ["serpent's ire", 'serpent ire'], tier: 3, label: "Serpent's Ire",
-    drops: ['Heroic Dragonsblood weapon (Ascended, tradable)', 'Heroic Dragonsblood Weapon Inscription', 'Branded Masses'],
-    note: "Guaranteed Ascended Heroic Dragonsblood weapon per completion (~80–250g on the TP). Weekly cap applies.",
-  },
-  {
-    idx: 3, matches: ["dragon's stand", 'dragons stand'], tier: 2, label: "Dragon's Stand",
-    drops: ['Blighting Tower chests (multiple per run)', 'Exquisite Serpentite Jewel', 'Exotic gear', 'HoT currencies (Crystalline Ore, Airship Parts, Ley Line Crystals)'],
-    note: "Best HoT meta. Multiple chests across the map reward ~30–80g total. Requires a successful full map clear.",
-  },
-  {
-    idx: 4, matches: ['thunderhead'], tier: 2, label: 'Thunderhead Peaks',
-    drops: ['Thunderhead weapon (Ascended, tradable)', 'Thunderhead Weapon Inscription', 'Xunlai Electrum Ingot'],
-    note: "Two meta events (Oil Floes and The Charge). Chance at Ascended Thunderhead weapons (~30–100g each). Weekly cap.",
-  },
-  {
-    idx: 5, matches: ['dragonfall'], tier: 2, label: 'Dragonfall',
-    drops: ['Branded weapons (Exotic)', 'Volatile Magic', 'Ley-Infused Sand', 'Skyscale mount items (Skyscale Egg)'],
-    note: "Solid daily meta. ~15–40g per run. Dragonfall Provisioner sells valuable items for Mistborn Motes.",
-  },
-  {
-    idx: 6, matches: ['karka queen'], tier: 1, label: 'Karka Queen',
-    drops: ['Exotic gear', 'Lost Orrian Jewelry Box (contains rare trinkets)', 'Crafting materials'],
-    note: "Daily boss. ~5–15g from chest. Lost Orrian Jewelry Box occasionally contains valuable trinkets.",
-  },
-  {
-    idx: 7, matches: ['great jungle wurm'], tier: 1, label: 'Great Jungle Wurm',
-    drops: ['Exotic weapons & armor', 'Crafting materials'],
-    note: "The simpler single-head jungle wurm (not Triple Trouble). ~5–15g daily chest.",
-  },
-  {
-    idx: 8, matches: ['auric basin', 'tarir'], tier: 1, label: 'Tarir — Auric Basin',
-    drops: ['Exquisite Serpentite Jewel', 'Auric weapons (Exotic)', 'Airship Parts, Ley Line Crystals', 'Four simultaneous golden chests'],
-    note: "One of the best HoT metas for time invested. ~10–30g. Four chests open simultaneously on success.",
-  },
-  {
-    idx: 9, matches: ['domain of istan', 'istan meta'], tier: 1, label: 'Domain of Istan',
-    drops: ['Exquisite Sand Effigy', 'Inscribed Shard', 'Exotic gear', 'Volatile Magic'],
-    note: "Great for Volatile Magic and Inscribed Shards farming. ~10–25g per run.",
-  },
-  {
-    idx: 10, matches: ['tangled depths'], tier: 1, label: 'Tangled Depths',
-    drops: ['Exquisite Serpentite Jewel', 'Crystalline Ore', 'Auric Ingot'],
-    note: "Complex multi-squad meta. ~10–25g per run.",
-  },
-];
+// Notable loot entries — add entries here when ready to populate with verified data.
+// Each entry: { idx, matches: string[], tier: 1|2|3, label, drops: string[], note }
+// `matches` substrings are tested against (segmentName + ' ' + groupName).toLowerCase().
+// tier 1 = notable, 2 = valuable, 3 = very valuable.
+const NOTABLE_LOOT = [];
 
 function getNotableLoot(segName, groupName) {
   const text = ((segName || '') + ' ' + (groupName || '')).toLowerCase();

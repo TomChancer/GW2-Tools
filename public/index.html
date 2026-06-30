@@ -298,7 +298,7 @@
   .flip-card.normal-flip { border-left: 3px solid var(--gold); }
   .flip-card.watching { box-shadow: 0 0 0 1px var(--gold-dim); }
 
-  .flip-header { display: grid; grid-template-columns: 40px 1fr auto auto auto auto; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; }
+  .flip-header { display: grid; grid-template-columns: 40px 1fr auto auto auto; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; }
 
   .drop-badge { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; white-space: nowrap; background: rgba(248,81,73,0.15); color: var(--red); }
   .roi-badge  { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; white-space: nowrap; background: rgba(63,185,80,0.12); color: var(--green); }
@@ -404,6 +404,26 @@
   .loot-drop-list { margin: 0 0 12px 0; padding-left: 18px; font-size: 12px; line-height: 1.9; color: var(--text-primary); }
   .loot-note { font-size: 11px; color: var(--text-muted); line-height: 1.6; padding: 10px 12px; background: var(--bg-elevated); border-radius: var(--radius-sm); }
   .scope-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; padding: 8px 10px; background: var(--bg-elevated); border-radius: var(--radius-sm); border-left: 3px solid var(--border); }
+
+  /* ── Flip grade badges ── */
+  .flip-grade { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+  .grade-a { background: rgba(63,185,80,0.18); color: var(--green); border: 1px solid rgba(63,185,80,0.35); }
+  .grade-b { background: rgba(200,164,90,0.18); color: var(--gold); border: 1px solid rgba(200,164,90,0.35); }
+  .grade-c { background: rgba(139,148,158,0.12); color: var(--text-muted); border: 1px solid var(--border); }
+
+  /* ── Flip step-by-step instructions ── */
+  .flip-steps { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+  .flip-step { display: flex; align-items: flex-start; gap: 10px; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 12px; }
+  .flip-step-num { width: 18px; height: 18px; border-radius: 50%; background: var(--gold); color: #0d1117; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .flip-step-text { flex: 1; line-height: 1.5; color: var(--text-primary); }
+  .flip-step-text strong { color: var(--green); font-family: var(--font-data); }
+  .flip-step-text em { color: var(--gold); font-style: normal; font-family: var(--font-data); }
+
+  .flip-market-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 8px; }
+  .flip-stat { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px solid var(--border-light); }
+  .flip-stat:last-child { border-bottom: none; }
+  .flip-stat-label { color: var(--text-secondary); }
+  .flip-stat-value { font-family: var(--font-data); }
 
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 5px; }
@@ -592,24 +612,16 @@
         <div id="syncStatusBanner"></div>
 
         <div class="sidebar-section">
-          <h3>Quick Wins</h3>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Listings priced below their recent average — buy cheap, relist at normal price</div>
-          <div class="filter-row">
-            <div>
-              <label>Min profit (silver)</label>
-              <input type="number" id="qwMinProfit" value="10" step="1" min="1"/>
-            </div>
-            <div>
-              <label>Below avg by (%)</label>
-              <input type="number" id="qwDropPct" value="20" step="5" min="5" max="80"/>
-            </div>
-          </div>
-        </div>
-
-        <div class="sidebar-section">
-          <h3>Normal Flips</h3>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Place buy orders, relist at sell price — profit from the spread</div>
+          <h3>Filters</h3>
           <div>
+            <label>Min profit (silver)</label>
+            <input type="number" id="flipMinProfit" value="50" step="10" min="1"/>
+          </div>
+          <div style="margin-top:8px;">
+            <label>Max spend (gold) <span style="font-size:10px;color:var(--text-muted);">0 = no limit</span></label>
+            <input type="number" id="flipMaxBudget" value="0" step="1" min="0"/>
+          </div>
+          <div style="margin-top:8px;">
             <label>Category</label>
             <select id="nfCategory">
               <option value="">All categories</option>
@@ -621,29 +633,28 @@
               <option value="">All subcategories</option>
             </select>
           </div>
-          <div class="filter-row" style="margin-top:6px;">
-            <div>
-              <label>Min profit (silver)</label>
-              <input type="number" id="nfMinProfit" value="10" step="1" min="1"/>
-            </div>
-            <div>
-              <label>Min ROI %</label>
-              <input type="number" id="nfMinROI" value="15" step="5" min="1"/>
-            </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="toggle-row" style="cursor:pointer;" onclick="toggleFlipAdvanced()">
+            <span class="toggle-label" style="font-weight:600;color:var(--text-primary);">Advanced filters</span>
+            <span id="flipAdvancedArrow" style="color:var(--text-muted);font-size:11px;">▸</span>
           </div>
-          <div class="filter-row">
-            <div>
-              <label>Min buy orders</label>
-              <input type="number" id="nfMinBuyQty" value="50" step="10" min="1"/>
+          <div id="flipAdvancedSection" style="display:none;margin-top:8px;display:none;flex-direction:column;gap:8px;">
+            <div class="filter-row">
+              <div>
+                <label>Min ROI %</label>
+                <input type="number" id="nfMinROI" value="20" step="5" min="1"/>
+              </div>
+              <div>
+                <label>Min buy orders</label>
+                <input type="number" id="nfMinBuyQty" value="250" step="50" min="1"/>
+              </div>
             </div>
             <div>
-              <label>Max spend (gold)</label>
-              <input type="number" id="nfMaxBuy" value="0" step="1" min="0" title="0 = no limit"/>
+              <label>Max spread ratio <span style="font-size:10px;color:var(--text-muted);">sell ÷ buy price</span></label>
+              <input type="number" id="nfMaxSpread" value="2.0" step="0.5" min="1.1" max="10"/>
             </div>
-          </div>
-          <div>
-            <label>Max sell/buy ratio <span style="color:var(--text-muted);font-size:10px;">(2.0 = sell ≤ 2× buy — removes thin markets)</span></label>
-            <input type="number" id="nfMaxSpread" value="2.0" step="0.5" min="1.1" max="10"/>
           </div>
         </div>
 
