@@ -194,7 +194,7 @@ function bindEvents() {
     if (e.target.id === 'settingsModal') closeSettings();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeSettings(); closeTimersConfig(); }
+    if (e.key === 'Escape') { closeSettings(); closeTimersConfig(); closeLootModal(); }
   });
 
   // Timers
@@ -204,6 +204,10 @@ function bindEvents() {
     if (e.target.id === 'timersConfigModal') closeTimersConfig();
   });
   document.getElementById('timersSyncBtn').addEventListener('click', triggerTimersSync);
+  document.getElementById('lootModalCloseBtn').addEventListener('click', closeLootModal);
+  document.getElementById('lootModal').addEventListener('click', (e) => {
+    if (e.target.id === 'lootModal') closeLootModal();
+  });
 
   // Craft controls
   document.getElementById('partialToggle').addEventListener('click', () => {
@@ -1649,6 +1653,90 @@ function escHtml(str) {
 
 // ── TIMERS ───────────────────────────────────────────────────────────────────
 
+// Curated notable loot data — matched against (segmentName + groupName) lowercased.
+// `matches` is an array of substrings; first match wins (order matters for overlapping names).
+const NOTABLE_LOOT = [
+  {
+    idx: 0, matches: ['tequatl'], tier: 3, label: 'Tequatl the Sunless',
+    drops: ["Tequatl's Hoard chest (daily)", 'Ascended weapon (account-bound)', 'Sunrise / Twilight legendary precursor (rare random)', 'Exotic weapons & armor'],
+    note: "One of the highest-reward world bosses. The Sunrise/Twilight precursor drops are rare but worth 300–1000g+. The Ascended daily chest weapon is ~80–150g.",
+  },
+  {
+    idx: 1, matches: ['triple trouble', 'evolved jungle wurm'], tier: 3, label: 'Triple Trouble Wurm',
+    drops: ['Ascended accessories (daily chest)', 'Exotic weapons & armor', 'Rare crafting materials', 'Evolved Hatchling Tonic'],
+    note: "Requires killing three wurm heads simultaneously — needs map coordination. Daily chest yields ~30–100g.",
+  },
+  {
+    idx: 2, matches: ["serpent's ire", 'serpent ire'], tier: 3, label: "Serpent's Ire",
+    drops: ['Heroic Dragonsblood weapon (Ascended, tradable)', 'Heroic Dragonsblood Weapon Inscription', 'Branded Masses'],
+    note: "Guaranteed Ascended Heroic Dragonsblood weapon per completion (~80–250g on the TP). Weekly cap applies.",
+  },
+  {
+    idx: 3, matches: ["dragon's stand", 'dragons stand'], tier: 2, label: "Dragon's Stand",
+    drops: ['Blighting Tower chests (multiple per run)', 'Exquisite Serpentite Jewel', 'Exotic gear', 'HoT currencies (Crystalline Ore, Airship Parts, Ley Line Crystals)'],
+    note: "Best HoT meta. Multiple chests across the map reward ~30–80g total. Requires a successful full map clear.",
+  },
+  {
+    idx: 4, matches: ['thunderhead'], tier: 2, label: 'Thunderhead Peaks',
+    drops: ['Thunderhead weapon (Ascended, tradable)', 'Thunderhead Weapon Inscription', 'Xunlai Electrum Ingot'],
+    note: "Two meta events (Oil Floes and The Charge). Chance at Ascended Thunderhead weapons (~30–100g each). Weekly cap.",
+  },
+  {
+    idx: 5, matches: ['dragonfall'], tier: 2, label: 'Dragonfall',
+    drops: ['Branded weapons (Exotic)', 'Volatile Magic', 'Ley-Infused Sand', 'Skyscale mount items (Skyscale Egg)'],
+    note: "Solid daily meta. ~15–40g per run. Dragonfall Provisioner sells valuable items for Mistborn Motes.",
+  },
+  {
+    idx: 6, matches: ['karka queen'], tier: 1, label: 'Karka Queen',
+    drops: ['Exotic gear', 'Lost Orrian Jewelry Box (contains rare trinkets)', 'Crafting materials'],
+    note: "Daily boss. ~5–15g from chest. Lost Orrian Jewelry Box occasionally contains valuable trinkets.",
+  },
+  {
+    idx: 7, matches: ['great jungle wurm'], tier: 1, label: 'Great Jungle Wurm',
+    drops: ['Exotic weapons & armor', 'Crafting materials'],
+    note: "The simpler single-head jungle wurm (not Triple Trouble). ~5–15g daily chest.",
+  },
+  {
+    idx: 8, matches: ['auric basin', 'tarir'], tier: 1, label: 'Tarir — Auric Basin',
+    drops: ['Exquisite Serpentite Jewel', 'Auric weapons (Exotic)', 'Airship Parts, Ley Line Crystals', 'Four simultaneous golden chests'],
+    note: "One of the best HoT metas for time invested. ~10–30g. Four chests open simultaneously on success.",
+  },
+  {
+    idx: 9, matches: ['domain of istan', 'istan meta'], tier: 1, label: 'Domain of Istan',
+    drops: ['Exquisite Sand Effigy', 'Inscribed Shard', 'Exotic gear', 'Volatile Magic'],
+    note: "Great for Volatile Magic and Inscribed Shards farming. ~10–25g per run.",
+  },
+  {
+    idx: 10, matches: ['tangled depths'], tier: 1, label: 'Tangled Depths',
+    drops: ['Exquisite Serpentite Jewel', 'Crystalline Ore', 'Auric Ingot'],
+    note: "Complex multi-squad meta. ~10–25g per run.",
+  },
+];
+
+function getNotableLoot(segName, groupName) {
+  const text = ((segName || '') + ' ' + (groupName || '')).toLowerCase();
+  return NOTABLE_LOOT.find(entry => entry.matches.some(m => text.includes(m))) || null;
+}
+
+function openLootModal(idx) {
+  const loot = NOTABLE_LOOT[idx];
+  if (!loot) return;
+  const tierLabel = loot.tier === 3 ? 'Very valuable' : loot.tier === 2 ? 'Valuable' : 'Notable';
+  document.getElementById('lootModalTitle').textContent = loot.label;
+  document.getElementById('lootModalBody').innerHTML = `
+    <div style="padding:4px 4px 12px;">
+      <div class="loot-tier">${'★'.repeat(loot.tier)}<span>${escHtml(tierLabel)}</span></div>
+      <div class="loot-section-label">Notable drops</div>
+      <ul class="loot-drop-list">${loot.drops.map(d => `<li>${escHtml(d)}</li>`).join('')}</ul>
+      <div class="loot-note">${escHtml(loot.note)}</div>
+    </div>`;
+  document.getElementById('lootModal').classList.add('active');
+}
+
+function closeLootModal() {
+  document.getElementById('lootModal').classList.remove('active');
+}
+
 let timersSyncPollTimer = null;
 
 async function pollTimersSyncStatus() {
@@ -1688,13 +1776,20 @@ function bgToCss(bg) {
 
 async function loadTimersSchedule() {
   try {
-    const data = await fetch('/api/timers/schedule?onlyTracked=true&hoursBack=0.5&hoursForward=3.5').then(r => r.json());
+    const [data, completion] = await Promise.all([
+      fetch('/api/timers/schedule?onlyTracked=true&hoursBack=0.5&hoursForward=3.5').then(r => r.json()),
+      state.apiKey
+        ? apiFetch('/api/timers/completion', { apiKey: state.apiKey }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
     if (!data.ok) throw new Error(data.error || 'Failed');
-    renderTimeline(data);
+    const completedNames = completion?.completedNames ? new Set(completion.completedNames) : null;
+    state._completionNote = completion?.note || null;
+    renderTimeline(data, completedNames);
   } catch(e) { /* silent — sync banner already reports server/data issues */ }
 }
 
-function renderTimeline(data) {
+function renderTimeline(data, completedNames) {
   const emptyState = document.getElementById('timersEmptyState');
   const wrap       = document.getElementById('timelineWrap');
   if (!data.groups.length) {
@@ -1719,20 +1814,46 @@ function renderTimeline(data) {
 
   let rowsHtml = '';
   for (const g of groups) {
+    const rowLoot = getNotableLoot('', g.name);
+    const labelLootBadge = rowLoot
+      ? `<span class="loot-badge" data-loot-idx="${rowLoot.idx}" title="${escHtml(rowLoot.label)} — click for drop info">★</span>`
+      : '';
+
     let segHtml = '';
     for (const seg of g.segments) {
       const left  = Math.max(0, (seg.start - windowStart) / totalMs * 100);
       const right = Math.min(100, (seg.end - windowStart) / totalMs * 100);
       if (right - left <= 0) continue;
-      const unnamed = seg.name ? '' : ' unnamed';
-      segHtml += `<div class="timeline-segment${unnamed}" style="left:${left}%;width:${right-left}%;background:${bgToCss(seg.bg)};" title="${escHtml(seg.name||'')}">${escHtml(seg.name||'')}</div>`;
+
+      const isDone   = !!(completedNames && seg.name && completedNames.has(seg.name.toLowerCase()));
+      const segLoot  = getNotableLoot(seg.name, g.name);
+      const unnamed  = seg.name ? '' : ' unnamed';
+      const doneClass = isDone ? ' done' : '';
+      const doneIcon  = isDone ? '<span class="timeline-done-icon">✓</span>' : '';
+      const starIcon  = segLoot
+        ? `<span class="timeline-seg-star" data-loot-idx="${segLoot.idx}" title="${escHtml(segLoot.label)} — click for drops">★</span>`
+        : '';
+
+      segHtml += `<div class="timeline-segment${unnamed}${doneClass}" style="left:${left}%;width:${right-left}%;background:${bgToCss(seg.bg)};" title="${escHtml(seg.name||'')}${isDone ? ' (done today)' : ''}">${doneIcon}${escHtml(seg.name||'')}${starIcon}</div>`;
     }
+
+    // Segment-level rows show name first, category small below (reversed from group rows)
+    const labelHtml = g.isSegmentLevel
+      ? `<div>${escHtml(g.name)}${labelLootBadge}</div><div class="cat">${escHtml(g.category)}</div>`
+      : `<div class="cat">${escHtml(g.category)}</div><div>${escHtml(g.name)}${labelLootBadge}</div>`;
+
     rowsHtml += `<div class="timeline-row">
-      <div class="timeline-row-label"><div class="cat">${escHtml(g.category)}</div><div>${escHtml(g.name)}</div></div>
+      <div class="timeline-row-label">${labelHtml}</div>
       <div class="timeline-row-track">${segHtml}<div class="timeline-now-line" style="left:${nowPct}%"></div></div>
     </div>`;
   }
-  document.getElementById('timelineRows').innerHTML = rowsHtml;
+  const rowsEl = document.getElementById('timelineRows');
+  rowsEl.innerHTML = rowsHtml;
+
+  // Event delegation for loot stars and badges (avoids inline onclick)
+  rowsEl.querySelectorAll('[data-loot-idx]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); openLootModal(parseInt(el.dataset.lootIdx)); });
+  });
 }
 
 // ── Timers config modal ───────────────────────────────────────────────────────
@@ -1762,23 +1883,74 @@ function renderTimersConfig(groups) {
   for (const [category, list] of Object.entries(byCategory)) {
     html += `<div class="timer-config-category">${escHtml(category)}</div>`;
     for (const g of list) {
+      const hasSegs = g.segments && g.segments.length > 1;
+      const anySegTracked = hasSegs && g.segments.some(s => s.tracked);
+      const expandLabel = hasSegs ? `${g.segments.length} boss${g.segments.length !== 1 ? 'es' : ''}` : '';
       html += `<div class="timer-config-row">
-        <input type="checkbox" id="track-${g.key}" data-key="${g.key}" ${g.tracked ? 'checked' : ''}>
-        <label for="track-${g.key}">${escHtml(g.name)}</label>
+        <input type="checkbox" id="track-${escHtml(g.key)}" data-key="${escHtml(g.key)}" ${g.tracked ? 'checked' : ''}>
+        <label for="track-${escHtml(g.key)}">${escHtml(g.name)}</label>
         <span class="timer-notify-label">notify</span>
-        <input type="number" class="timer-notify-input" data-key="${g.key}" value="${g.notifyMinutes}" min="1" max="180">
+        <input type="number" class="timer-notify-input" data-key="${escHtml(g.key)}" value="${g.notifyMinutes}" min="1" max="180">
         <span class="timer-notify-label">min before</span>
+        ${hasSegs ? `<button class="timer-expand-btn" data-key="${escHtml(g.key)}" onclick="toggleTimerSegments('${escHtml(g.key)}')">▸ ${escHtml(expandLabel)}</button>` : ''}
       </div>`;
+      if (hasSegs) {
+        // Auto-expand if any individual segment is tracked
+        const expanded = anySegTracked;
+        html += `<div class="timer-segment-section" id="segs-${escHtml(g.key)}" style="display:${expanded ? 'block' : 'none'};">`;
+        for (const seg of g.segments) {
+          html += `<div class="timer-config-segment-row">
+            <input type="checkbox" id="seg-${escHtml(g.key)}-${escHtml(seg.ref)}" data-gkey="${escHtml(g.key)}" data-sref="${escHtml(seg.ref)}" ${seg.tracked ? 'checked' : ''}>
+            <label for="seg-${escHtml(g.key)}-${escHtml(seg.ref)}">${escHtml(seg.name)}</label>
+            <span class="timer-notify-label">notify</span>
+            <input type="number" class="timer-seg-notify-input" data-gkey="${escHtml(g.key)}" data-sref="${escHtml(seg.ref)}" value="${seg.notifyMinutes}" min="1" max="180">
+            <span class="timer-notify-label">min</span>
+          </div>`;
+        }
+        html += `</div>`;
+        // Reflect expanded state in button label
+        if (expanded) {
+          // Will be updated after innerHTML is set
+        }
+      }
     }
   }
   document.getElementById('timersConfigBody').innerHTML = html;
 
-  document.querySelectorAll('#timersConfigBody input[type="checkbox"]').forEach(cb => {
+  // Update expand button labels to match actual state
+  document.querySelectorAll('.timer-expand-btn').forEach(btn => {
+    const key = btn.dataset.key;
+    const section = document.getElementById(`segs-${key}`);
+    if (section && section.style.display !== 'none') {
+      const count = section.querySelectorAll('.timer-config-segment-row').length;
+      btn.textContent = `▾ ${count} boss${count !== 1 ? 'es' : ''}`;
+    }
+  });
+
+  // Group-level events
+  document.querySelectorAll('#timersConfigBody input[type="checkbox"][data-key]').forEach(cb => {
     cb.addEventListener('change', () => saveTimerTracking(cb.dataset.key));
   });
-  document.querySelectorAll('#timersConfigBody input[type="number"]').forEach(inp => {
+  document.querySelectorAll('#timersConfigBody input[type="number"][data-key]').forEach(inp => {
     inp.addEventListener('change', () => saveTimerTracking(inp.dataset.key));
   });
+  // Per-segment events
+  document.querySelectorAll('#timersConfigBody input[type="checkbox"][data-gkey]').forEach(cb => {
+    cb.addEventListener('change', () => saveSegmentTracking(cb.dataset.gkey, cb.dataset.sref));
+  });
+  document.querySelectorAll('#timersConfigBody input[type="number"][data-gkey]').forEach(inp => {
+    inp.addEventListener('change', () => saveSegmentTracking(inp.dataset.gkey, inp.dataset.sref));
+  });
+}
+
+function toggleTimerSegments(groupKey) {
+  const section = document.getElementById(`segs-${groupKey}`);
+  const btn = document.querySelector(`.timer-expand-btn[data-key="${groupKey}"]`);
+  if (!section || !btn) return;
+  const open = section.style.display !== 'none';
+  section.style.display = open ? 'none' : 'block';
+  const count = section.querySelectorAll('.timer-config-segment-row').length;
+  btn.textContent = open ? `▸ ${count} boss${count !== 1 ? 'es' : ''}` : `▾ ${count} boss${count !== 1 ? 'es' : ''}`;
 }
 
 async function saveTimerTracking(groupKey) {
@@ -1787,6 +1959,18 @@ async function saveTimerTracking(groupKey) {
   try {
     await apiFetch('/api/timers/track', {
       groupKey, enabled: checkbox.checked, notifyMinutes: parseInt(numInput.value) || 10,
+    });
+    if (state.activeTab === 'timers') loadTimersSchedule();
+  } catch(e) {}
+}
+
+async function saveSegmentTracking(groupKey, segmentRef) {
+  const checkbox = document.getElementById(`seg-${groupKey}-${segmentRef}`);
+  const numInput = document.querySelector(`.timer-seg-notify-input[data-gkey="${groupKey}"][data-sref="${segmentRef}"]`);
+  if (!checkbox) return;
+  try {
+    await apiFetch('/api/timers/track-segment', {
+      groupKey, segmentRef, enabled: checkbox.checked, notifyMinutes: parseInt(numInput?.value) || 10,
     });
     if (state.activeTab === 'timers') loadTimersSchedule();
   } catch(e) {}

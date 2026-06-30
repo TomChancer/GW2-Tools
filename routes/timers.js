@@ -98,15 +98,48 @@ function nextNamedOccurrence(group, afterMs) {
   return schedule.find(seg => seg.name && seg.start > afterMs) || null;
 }
 
+// ── World boss API ID → lowercase segment name mapping ───────────────────────
+// The wiki timer widget uses numeric segment refs (1, 2, 3…), not name-based IDs,
+// so completion matching must go via segment names rather than refs.
+// Each value is the lowercase canonical segment name as it appears in the wiki data.
+const WORLDBOSS_API_TO_NAME = {
+  'admiral_taidha_covington': 'admiral taidha covington',
+  'claw_of_jormag':           'claw of jormag',
+  'fire_elemental':           'fire elemental',
+  'golem_mark_ii':            'golem mark ii',
+  'great_jungle_wurm':        'great jungle wurm',
+  'juniper_mindweb':          'juniper mindweb',
+  'karka_queen':              'karka queen',
+  'megadestroyer':            'megadestroyer',
+  'modniir_ulgoth':           'modniir ulgoth',
+  'shadow_behemoth':          'shadow behemoth',
+  'svanir_shaman_chief':      'svanir shaman chief',
+  'tequatl':                  'tequatl',
+  'the_shatterer':            'the shatterer',
+  'triple_trouble':           'triple trouble',
+};
+
 // ── Routes ───────────────────────────────────────────────────────────────────────
 
+// Returns all groups with their named segments (and per-segment tracking state).
+// The segments array preserves schedule order (unique refs in sequence order).
 router.get('/groups', (req, res) => {
   try {
     const groups = db.getFullEventData();
-    res.json({ ok: true, groups: groups.map(g => ({
-      key: g.key, category: g.category, name: g.name, link: g.link,
-      tracked: g.tracked, notifyMinutes: g.notifyMinutes,
-    })) });
+    res.json({ ok: true, groups: groups.map(g => {
+      const seenRefs = new Set();
+      const seqOrder = [...(g.sequences.partial || []), ...(g.sequences.pattern || [])];
+      const orderedRefs = seqOrder.map(s => s.r).filter(r => {
+        if (seenRefs.has(r)) return false; seenRefs.add(r); return true;
+      });
+      const segments = orderedRefs
+        .filter(ref => g.segments[ref]?.name)
+        .map(ref => ({ ref, name: g.segments[ref].name, tracked: g.segments[ref].segTracked, notifyMinutes: g.segments[ref].segNotifyMinutes }));
+      return {
+        key: g.key, category: g.category, name: g.name, link: g.link,
+        tracked: g.tracked, notifyMinutes: g.notifyMinutes, segments,
+      };
+    }) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -117,23 +150,80 @@ router.post('/track', (req, res) => {
   res.json({ ok: true });
 });
 
+router.post('/track-segment', (req, res) => {
+  const { groupKey, segmentRef, enabled, notifyMinutes } = req.body;
+  if (!groupKey || !segmentRef) return res.status(400).json({ error: 'groupKey and segmentRef required' });
+  db.setTrackedSegment(groupKey, segmentRef, !!enabled, Math.max(1, parseInt(notifyMinutes) || 10));
+  res.json({ ok: true });
+});
+
+// Returns the schedule for tracked groups/segments.
+// Groups with any individually tracked segments emit per-segment rows instead of one group row,
+// which gives each boss its own timeline lane with only its own occurrences visible.
 router.get('/schedule', (req, res) => {
   try {
     const hoursBack    = Math.min(parseFloat(req.query.hoursBack)    || 0.5, 6);
-    const hoursForward  = Math.min(parseFloat(req.query.hoursForward) || 4,  12);
+    const hoursForward = Math.min(parseFloat(req.query.hoursForward) || 4,  12);
     const onlyTracked  = req.query.onlyTracked !== 'false';
     const now = Date.now();
     const windowStart = now - hoursBack * 3600000;
     const windowEnd   = now + hoursForward * 3600000;
 
-    const groups = db.getFullEventData().filter(g => !onlyTracked || g.tracked);
-    const result = groups.map(g => ({
-      key: g.key, category: g.category, name: g.name, link: g.link,
-      tracked: g.tracked, notifyMinutes: g.notifyMinutes,
-      segments: computeSchedule(g, windowStart, windowEnd),
-    }));
+    const groups = db.getFullEventData();
+    const result = [];
+
+    // Which groups have at least one individually tracked segment (segment mode)
+    const segModeGroups = new Set(
+      groups.filter(g => Object.values(g.segments).some(s => s.segTracked)).map(g => g.key)
+    );
+
+    for (const g of groups) {
+      if (segModeGroups.has(g.key)) {
+        // Segment mode: emit one row per tracked segment
+        for (const [ref, seg] of Object.entries(g.segments)) {
+          if (!seg.segTracked) continue;
+          const segsInWindow = computeSchedule(g, windowStart, windowEnd).filter(s => s.ref === ref);
+          result.push({
+            key: `${g.key}:${ref}`, category: g.category, name: seg.name, link: seg.link,
+            tracked: true, notifyMinutes: seg.segNotifyMinutes,
+            segments: segsInWindow, isSegmentLevel: true,
+          });
+        }
+      } else {
+        if (onlyTracked && !g.tracked) continue;
+        result.push({
+          key: g.key, category: g.category, name: g.name, link: g.link,
+          tracked: g.tracked, notifyMinutes: g.notifyMinutes,
+          segments: computeSchedule(g, windowStart, windowEnd),
+          isSegmentLevel: false,
+        });
+      }
+    }
+
     res.json({ ok: true, now, windowStart, windowEnd, groups: result });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Fetches which world bosses the account has completed today.
+// Requires the API key to have `progression` scope — returns completedRefs: null (not []) when scope is missing.
+router.post('/completion', async (req, res) => {
+  const { apiKey } = req.body;
+  if (!apiKey) return res.json({ ok: true, completedRefs: [] });
+  try {
+    const resp = await fetch('https://api.guildwars2.com/v2/account/worldbosses', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (resp.status === 403) {
+      return res.json({ ok: true, completedRefs: null, note: 'progression_scope_required' });
+    }
+    if (!resp.ok) throw new Error(`GW2 API ${resp.status}`);
+    const bossIds = await resp.json();
+    // Map to canonical lowercase segment names for client-side name matching
+    const completedNames = bossIds.map(id => WORLDBOSS_API_TO_NAME[id] || id.replace(/_/g, ' '));
+    res.json({ ok: true, completedNames });
+  } catch(e) {
+    res.json({ ok: false, error: e.message, completedRefs: [] });
+  }
 });
 
 router.get('/sync-status', (req, res) => {
@@ -157,37 +247,59 @@ if (process.versions && process.versions.electron) {
   } catch(e) { /* not actually running inside Electron's main process */ }
 }
 
+function fireNotification(title, body) {
+  console.log(`[TimerNotify] Firing: ${title}`);
+  const notif = new Notification({ title, body });
+  notif.on('show',   ()      => console.log('[TimerNotify] show event fired'));
+  notif.on('failed', (e, err) => console.error('[TimerNotify] failed event:', err));
+  notif.show();
+}
+
 function checkNotifications() {
   if (!Notification) return;
   if (Notification.isSupported && !Notification.isSupported()) {
     console.warn('[TimerNotify] Notification.isSupported() is false — OS-level notifications are blocked or unavailable on this machine');
     return;
   }
-  const now = Date.now();
-  const tracked = db.getTrackedEvents();
-  if (!tracked.length) return;
-
+  const now    = Date.now();
   const groups = db.getFullEventData();
   const byKey  = {};
   for (const g of groups) byKey[g.key] = g;
 
+  // Group-level notifications
+  const tracked = db.getTrackedEvents();
   for (const t of tracked) {
     const group = byKey[t.group_key];
     if (!group) continue;
     const next = nextNamedOccurrence(group, now);
     if (!next) continue;
-
     const minutesUntil = (next.start - now) / 60000;
     if (minutesUntil <= t.notify_minutes && next.start !== t.last_notified) {
-      console.log(`[TimerNotify] Firing: ${next.name} in ${Math.round(minutesUntil)} min (group ${t.group_key})`);
-      const notif = new Notification({
-        title: `${next.name} — starting soon`,
-        body: `${group.name} (${group.category}) in ${Math.max(0, Math.round(minutesUntil))} min`,
-      });
-      notif.on('show', () => console.log('[TimerNotify] show event fired'));
-      notif.on('failed', (e, err) => console.error('[TimerNotify] failed event:', err));
-      notif.show();
+      fireNotification(
+        `${next.name} — starting soon`,
+        `${group.name} (${group.category}) in ${Math.max(0, Math.round(minutesUntil))} min`
+      );
       db.setLastNotified(t.group_key, next.start);
+    }
+  }
+
+  // Per-segment notifications
+  const trackedSegs = db.getTrackedSegments();
+  for (const ts of trackedSegs) {
+    const group = byKey[ts.group_key];
+    if (!group) continue;
+    const segDef = group.segments[ts.segment_ref];
+    if (!segDef) continue;
+    const schedule = computeSchedule(group, now, now + 2 * DAY_MIN * 60000);
+    const next = schedule.find(s => s.ref === ts.segment_ref && s.start > now && s.name);
+    if (!next) continue;
+    const minutesUntil = (next.start - now) / 60000;
+    if (minutesUntil <= ts.notify_minutes && next.start !== ts.last_notified) {
+      fireNotification(
+        `${next.name} — starting soon`,
+        `${group.category} in ${Math.max(0, Math.round(minutesUntil))} min`
+      );
+      db.setSegmentLastNotified(ts.group_key, ts.segment_ref, next.start);
     }
   }
 }

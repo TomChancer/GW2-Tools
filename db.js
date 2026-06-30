@@ -191,6 +191,18 @@ function initSchema(db) {
       notify_minutes INTEGER NOT NULL DEFAULT 10,
       last_notified  INTEGER NOT NULL DEFAULT 0
     );
+
+    -- Per-segment tracking — lets users track individual bosses within a group (e.g. Tequatl
+    -- but not Shadow Behemoth). When any segment in a group is tracked here, the schedule
+    -- endpoint emits per-segment rows instead of the group-level row for that group.
+    CREATE TABLE IF NOT EXISTS tracked_segments (
+      group_key      TEXT NOT NULL,
+      segment_ref    TEXT NOT NULL,
+      enabled        INTEGER NOT NULL DEFAULT 1,
+      notify_minutes INTEGER NOT NULL DEFAULT 10,
+      last_notified  INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (group_key, segment_ref)
+    );
   `);
 }
 
@@ -604,18 +616,28 @@ function upsertEventTimerData(groups) {
 // Reassembles the full nested shape (matching the original wiki data.json) for the
 // schedule-computation algorithm to consume, plus merges in the user's tracking state.
 function getFullEventData() {
-  const groups   = queryAll('SELECT * FROM event_groups');
-  const segments = queryAll('SELECT * FROM event_segments');
-  const seqs      = queryAll('SELECT * FROM event_sequences ORDER BY group_key, seq_type, order_index');
-  const tracked   = queryAll('SELECT * FROM tracked_events');
+  const groups      = queryAll('SELECT * FROM event_groups');
+  const segments    = queryAll('SELECT * FROM event_segments');
+  const seqs        = queryAll('SELECT * FROM event_sequences ORDER BY group_key, seq_type, order_index');
+  const tracked     = queryAll('SELECT * FROM tracked_events');
+  const trackedSegs = queryAll('SELECT * FROM tracked_segments');
 
   const trackedMap = {};
   for (const t of tracked) trackedMap[t.group_key] = t;
 
+  const trackedSegMap = {};
+  for (const ts of trackedSegs) trackedSegMap[`${ts.group_key}:${ts.segment_ref}`] = ts;
+
   const segByGroup = {};
-  for (const s of segments) (segByGroup[s.group_key] = segByGroup[s.group_key] || {})[s.segment_ref] = {
-    name: s.name, link: s.link, chatlink: s.chatlink, bg: JSON.parse(s.bg || 'null'),
-  };
+  for (const s of segments) {
+    const ts = trackedSegMap[`${s.group_key}:${s.segment_ref}`];
+    (segByGroup[s.group_key] = segByGroup[s.group_key] || {})[s.segment_ref] = {
+      name: s.name, link: s.link, chatlink: s.chatlink, bg: JSON.parse(s.bg || 'null'),
+      segTracked: ts ? !!ts.enabled : false,
+      segNotifyMinutes: ts ? ts.notify_minutes : 10,
+      segLastNotified: ts ? ts.last_notified : 0,
+    };
+  }
 
   const seqByGroup = {};
   for (const q of seqs) {
@@ -647,6 +669,24 @@ function setTrackedEvent(groupKey, enabled, notifyMinutes) {
 
 function setLastNotified(groupKey, timestamp) {
   _db.run('UPDATE tracked_events SET last_notified = ? WHERE group_key = ?', [timestamp, groupKey]);
+  save();
+}
+
+function getTrackedSegments() {
+  return queryAll('SELECT * FROM tracked_segments WHERE enabled = 1');
+}
+
+function setTrackedSegment(groupKey, segmentRef, enabled, notifyMinutes) {
+  _db.run(`
+    INSERT INTO tracked_segments (group_key, segment_ref, enabled, notify_minutes, last_notified)
+    VALUES (?, ?, ?, ?, 0)
+    ON CONFLICT(group_key, segment_ref) DO UPDATE SET enabled = excluded.enabled, notify_minutes = excluded.notify_minutes
+  `, [groupKey, segmentRef, enabled ? 1 : 0, notifyMinutes]);
+  save();
+}
+
+function setSegmentLastNotified(groupKey, segmentRef, timestamp) {
+  _db.run('UPDATE tracked_segments SET last_notified = ? WHERE group_key = ? AND segment_ref = ?', [timestamp, groupKey, segmentRef]);
   save();
 }
 
@@ -874,5 +914,7 @@ module.exports = {
   getAchievementCollectionCategories, searchCollections,
   getCollectionDetail, getMissingAchievementItems, getAllCollectionsWithBits,
   // Event timers
-  upsertEventTimerData, getFullEventData, getTrackedEvents, setTrackedEvent, setLastNotified,
+  upsertEventTimerData, getFullEventData,
+  getTrackedEvents, setTrackedEvent, setLastNotified,
+  getTrackedSegments, setTrackedSegment, setSegmentLastNotified,
 };
